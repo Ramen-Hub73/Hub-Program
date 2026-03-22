@@ -1,0 +1,317 @@
+ConfigWidget
+=========================
+Made for tkinter widgets, takes first argument (the widget name), passes the third argument "value" that must be a string into the second argument "arg" that must be a string aswell
+
+Log
+=========================
+Logs first argument "entry" into f"{self_name}Logs.txt", formatted with second argument "type" which can be "ACCESS", "SYSTEM", or "INFO".
+
+Update
+=========================
+Updates the main textbox widget, takes an optional "scroll" argument that can be "up" or "down", which goes to the top and bottom of the textbox respectively.
+
+Scan
+=========================
+Returns the content of the main textbox widget as a string
+
+Input
+=========================
+Inputs first argument "input" into the main textbox widget
+
+Delete
+=========================
+Deletes from the line "start" default is 1, and decides how many lines to delete from there by the second argument "lines", default is "All". Functionality might not work for deleting selected lines as it's old and I forgot.
+
+Show
+=========================
+Deletes everything from the main textbox widget, takes the same argument of Input and has the same functionality
+
+Slowprint
+=========================
+Types each character of first argument "text" with the delay of fourth argument "delay" into the main textbox widget. Has other arguments of "plus" (second argument) which adds to the textbox without deleting previous content, the default is False and a third argument of "chars_to_skip" which can be a list or string of characters which don't have delay between printing to the textbox. 
+
+Centered
+=========================
+Just read the code for it, it's annoying to explain but should be easy to understand. Basically it just return the input in the middle of the string.
+
+ContentOfFile
+=========================
+Returns the content of first argument "filename" as a "String" or "List" based off second argument "type", and has optional third argument "clarification" which tells if the file doesn't exist or is empty, default is True.
+
+WriteTo
+=========================
+Writes second argument "content" into first argument "filename".
+
+Zip
+=========================
+Same annoyance of Centered, it makes two lists into one though basically, "zipping" them.
+
+FunctionsOf
+=========================
+Reads first argument "file" and returns functions based off fourth argument "ext" (Only python currently, default "py") can choose based off second argument "indexes" whether it returns list of line indexes along with the function names. Can also choose whether to include classes in the output with third argument "class_inclusion" (default is False). Best to play around with it for a better understanding and look inside EditScript where its used.
+
+FormatSize
+=========================
+Just another helper function for turning first argument "bytes" (an int input) into a formatted string with proper size declaration like "MB" or "GB"
+
+SetSelected
+=========================
+Sets the variable "selected_script" as the formatted version if argument "name" is above 20 characters long.
+
+Filepath
+=========================
+Returns the likely filepath for the currently selected script. This is not a function that would work good outside of the Hub Program.
+
+Filename
+=========================
+Gets the filename from an argument "path"
+
+SeeCode
+=========================
+Displays the inners of a file "filename", shows if not allowed access, if function setting is turned off, asks confirmation for copying content to clipboard.
+
+RunScript
+=========================
+
+
+    (RunScript) ScriptThread
+=========================
+
+
+CloseScript
+=========================
+
+
+DriveSelect
+=========================
+
+
+ListScripts
+=========================
+
+
+EditScript
+=========================
+
+
+        (EditScript) Exit
+=========================
+
+
+        (EditScript) PulseFuncDrop
+=========================
+
+
+        (EditScript) FindLine
+=========================
+
+
+        (EditScript) FindString
+=========================
+
+
+            (EditScript) Next
+=========================
+
+
+            (EditScript) Prev
+=========================
+
+
+        (EditScript) UpdateIndex
+=========================
+
+
+        (EditScript) RenameScript
+=========================
+
+
+        (EditScript) SaveScript
+=========================
+
+
+        (EditScript) DeleteScript
+=========================
+
+
+        (EditScript) RestoreScript
+=========================
+
+
+        (EditScript) Info
+=========================
+
+
+Refresh
+=========================
+
+
+DropdownManipulation
+=========================
+
+
+    (DropdownManipulation) Add
+=========================
+
+
+    (DropdownManipulation) Remove
+=========================
+
+
+ModuleManipulation
+=========================
+
+
+Backup
+=========================
+
+
+ListModules
+=========================
+
+
+ApplySettings
+=========================
+
+
+BinaryIn
+=========================
+
+
+BinaryOut
+=========================
+
+
+OpenSettings
+=========================
+
+
+    (OpenSettings) ChangePage
+=========================
+
+
+    (OpenSettings) ReframeToKeybinds
+=========================
+
+
+        (OpenSettings) Set
+=========================
+
+
+        (OpenSettings) Exit
+=========================
+
+
+        (OpenSettings) SaveExit
+=========================
+
+
+    (OpenSettings) ReframeToCheckboxes
+=========================
+
+
+        (OpenSettings) Set
+=========================
+
+
+        (OpenSettings) Exit
+=========================
+
+
+        (OpenSettings) SaveExit
+=========================
+
+
+        (OpenSettings) SignalUpdate
+=========================
+
+
+        (OpenSettings) UpdateId
+=========================
+
+
+        (OpenSettings) InputID
+=========================
+
+
+        (OpenSettings) Flip
+=========================
+
+
+CreateScript
+=========================
+
+
+TopWindow
+=========================
+
+
+OnScriptSelection
+=========================
+
+
+ShowBinds
+=========================
+
+
+FilteredFiles
+=========================
+
+
+ListDropdown
+=========================
+
+
+ReorderScripts
+=========================
+
+
+Info
+=========================
+
+
+CloseHub
+=========================
+
+
+ReloadDropdown
+=========================
+
+
+UpdateScripts
+=========================
+
+
+LaunchCommandWindow
+=========================
+
+
+    (LaunchCommandWindow) Run
+=========================
+
+
+    (LaunchCommandWindow) Exit
+=========================
+
+
+    (LaunchCommandWindow) RunExit
+=========================
+
+
+    (LaunchCommandWindow) NextHistory
+=========================
+
+
+    (LaunchCommandWindow) PrevHistory
+=========================
+
+
+WebSearch
+=========================
+
+
+SystemRun
+=========================
+
+
+        (SystemRun) Execute
