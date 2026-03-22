@@ -914,7 +914,7 @@ def ApplySettings() -> None:
 	global setting_variables
 	setting_variables = [tk.BooleanVar() for i in range(25)]
 	setting_file_content = ContentOfFile(f"{self_name}Settings.txt").strip()
-	disregard = setting_file_content.endswith("File")
+	disregard = True if setting_file_content.endswith("File") else False
 	if disregard:
 		settings_string = "0" * 25
 	else:
