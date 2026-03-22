@@ -28,20 +28,28 @@ self_file = __file__[len(__file__) - __file__[::-1].find("\\"):]
 self_name = f"{self_file.replace('.py', '')}"
 platform = sys.platform
 
+print(self_file, self_name, platform)
+
 root = tk.Tk()
 root.title(self_name)
 root.resizable(False, False)
-root.iconbitmap(default="Hub_Default_Icon.ico")
-root.iconbitmap("Hub_Icon.ico")
 
 Length, Height = 70, 30
 command_history = []
 run = None
 absolute_filepath = open_file
 self_directory = os.path.dirname(os.path.realpath(__file__))
-setting_variables = [tk.StringVar() for i in range(25)]
+setting_variables = [tk.BooleanVar() for i in range(25)]
 for var in setting_variables:
 	var.set("0")
+
+print(self_directory)
+
+try:
+	root.iconbitmap(default="Hub_Default_Icon.ico")
+	root.iconbitmap("Hub_Icon.ico")
+except Exception:
+	pass
 
 """
 
@@ -499,7 +507,10 @@ def EditScript(filename=None) -> None:
 		edit_root = Toplevel(root)
 		edit_root.title(f"{filename} Edit Window")
 		edit_root.resizable(False, False)
-		edit_root.iconbitmap("Hub_File_Icon.ico")
+		try:
+			edit_root.iconbitmap("Hub_File_Icon.ico")
+		except Exception:
+			pass
 		edit_root.focus()
 
 		editing_self = False
@@ -914,13 +925,13 @@ def ApplySettings() -> None:
 	global setting_variables
 	setting_variables = [tk.BooleanVar() for i in range(25)]
 	setting_file_content = ContentOfFile(f"{self_name}Settings.txt").strip()
-	disregard = True if setting_file_content.endswith("File") else False
+	disregard = setting_file_content.endswith("File")
 	if disregard:
 		settings_string = "0" * 25
 	else:
 		settings_string = setting_file_content
 	for index, value in enumerate(settings_string):
-		setting_variables[index].set(value)
+		setting_variables[index].set(int(value))
 
 def BinaryIn(binary_string="") -> str:
 	Log(f"BinaryIn(binary_string={binary_string})")
@@ -956,7 +967,10 @@ def OpenSettings(page:int=0, update:bool=False, _from=root) -> None:
 	settings_root.title("Hub Settings")
 	settings_root.resizable(False, False)
 	settings_root.focus()
-	settings_root.iconbitmap("Hub_Settings_Icon.ico")
+	try:
+		settings_root.iconbitmap("Hub_Settings_Icon.ico")
+	except Exception:
+		pass
 
 	def ChangePage(page:int=0) -> None:
 		widgets = settings_root.winfo_children()
@@ -1045,7 +1059,7 @@ def OpenSettings(page:int=0, update:bool=False, _from=root) -> None:
 			id = simpledialog.askinteger("Settings ID Input", "Input the desired ID.", parent=settings_root)
 			binary_str = BinaryOut(id)
 			for index, setting_object in enumerate(setting_variables):
-				setting_object.set(binary_str[index])
+				setting_object.set(int(binary_str[index]))
 
 		def Flip(page:int=0) -> None:
 			Exit()
@@ -1144,8 +1158,6 @@ def TopWindow(window=None, hold=False, cancel=True):
 def OnScriptSelection(event=None, file=None, *args) -> None:
 	Log("OnScriptSelection()")
 	function_setting = bool(setting_variables[6].get())
-	if not function_setting:
-		return
 	Delete()
 	file = selected_script.get() if file == None else file
 	filepath = Filepath(file)
@@ -1155,11 +1167,12 @@ def OnScriptSelection(event=None, file=None, *args) -> None:
 	if not os.path.exists(filepath):
 		return
 	ConfigWidget(["run_button", "edit_button", "see_code_button", "dropdown_button"], "state", "tk.NORMAL")
-	Input(Centered(f"File Info", "=", end=True, end_line=2))
-	mod_time_timestamp = os.path.getmtime(filepath) #Gemini Help (2 Lines) 
-	mod_datetime = f"{datetime.fromtimestamp(mod_time_timestamp)}"
-	mod_datetime = mod_datetime[:-len(mod_datetime) + mod_datetime.find('.')]
-	Input(f"Path: {filepath}\n\nSize: {FormatSize(os.path.getsize(filepath))}\n\nLast Modified: {mod_datetime if mod_datetime.strip() != '' else 'Not Available'}\n\n")
+	if function_setting:
+		Input(Centered(f"File Info", "=", end=True, end_line=2))
+		mod_time_timestamp = os.path.getmtime(filepath) #Gemini Help (2 Lines) 
+		mod_datetime = f"{datetime.fromtimestamp(mod_time_timestamp)}"
+		mod_datetime = mod_datetime[:-len(mod_datetime) + mod_datetime.find('.')]
+		Input(f"Path: {filepath}\n\nSize: {FormatSize(os.path.getsize(filepath))}\n\nLast Modified: {mod_datetime if mod_datetime.strip() != '' else 'Not Available'}\n\n")
 
 def ShowBinds() -> None:
 	Delete()
@@ -1267,7 +1280,10 @@ def LaunchCommandWindow() -> None:
 	command_root = Toplevel(root)
 	command_root.title(f"{self_name} Command Window")
 	command_root.resizable(False, False)
-	command_root.iconbitmap("Hub_Command_Icon.ico")
+	try:
+		command_root.iconbitmap("Hub_Command_Icon.ico")
+	except Exception:
+		pass
 	#command_root.config(bg="gray")
 	command_root.focus()
 
