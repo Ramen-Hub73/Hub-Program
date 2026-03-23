@@ -1469,6 +1469,7 @@ keyboard.add_hotkey("ctrl+shift+h", lambda: TopWindow(root))
 
 if open_file != None:
 	OnScriptSelection(opened_filename)
+	SeeCode()
 
 TopWindow(root, hold=True)
 root.focus()
