@@ -18,15 +18,18 @@ import webbrowser
 if 'win' in sys.platform:
 	ctypes.windll.shcore.SetProcessDpiAwareness(2)
 
+self_file = __file__[len(__file__) - __file__[::-1].find("\\"):]
+self_name = f"{self_file.replace('.py', '')}"
+platform = sys.platform
+
 try:
 	open_file = sys.argv[1]
 	print(f"Opening: {open_file}")
 except Exception:
-	open_file = None
-
-self_file = __file__[len(__file__) - __file__[::-1].find("\\"):]
-self_name = f"{self_file.replace('.py', '')}"
-platform = sys.platform
+	if not os.path.exists(f"{self_name}Condition.txt"):
+		open_file = "README.md"
+	else:
+		open_file = None
 
 print(self_file, self_name, platform)
 
