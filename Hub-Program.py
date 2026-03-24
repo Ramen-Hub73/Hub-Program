@@ -7,7 +7,7 @@ import sys
 import time
 import ctypes
 import importlib.util
-import pkg_resources
+from importlib.metadata import distributions
 import pyperclip
 import keyboard
 from pathlib import Path
@@ -18,41 +18,38 @@ import webbrowser
 if 'win' in sys.platform:
 	ctypes.windll.shcore.SetProcessDpiAwareness(2)
 
-self_file = __file__[len(__file__) - __file__[::-1].find("\\"):]
-self_name = f"{self_file.replace('.py', '')}"
-platform = sys.platform
-
 try:
 	open_file = sys.argv[1]
 	print(f"Opening: {open_file}")
 except Exception:
-	if not os.path.exists(f"{self_name}Condition.txt"):
-		open_file = "README.md"
-	else:
-		open_file = None
+	open_file = None
+
+self_file = __file__[len(__file__) - __file__[::-1].find("\\"):]
+self_name = f"{self_file.replace('.py', '')}"
+platform = sys.platform
 
 print(self_file, self_name, platform)
 
-root = tk.Tk()
-root.title(self_name)
-root.resizable(False, False)
+class Theme:
+	def __init__(self, bg="gray94", fg="black", tb_bg="white", tb_fg="black", insert="black"):
+		self.bg = bg
+		self.fg = fg
+		self.tb_bg = tb_bg
+		self.tb_fg = tb_fg
 
+	def Config(self, bg="gray94", fg="black", tb_bg="white", tb_fg="black", insert="black"):
+		self.bg = bg
+		self.fg = fg
+		self.tb_bg = tb_bg
+		self.tb_fg = tb_fg
+		self.insert = insert
+
+self_theme = Theme()
 Length, Height = 70, 30
 command_history = []
 run = None
 absolute_filepath = open_file
 self_directory = os.path.dirname(os.path.realpath(__file__))
-setting_variables = [tk.BooleanVar() for i in range(25)]
-for var in setting_variables:
-	var.set("0")
-
-print(self_directory)
-
-try:
-	root.iconbitmap(default="Hub_Default_Icon.ico")
-	root.iconbitmap("Hub_Icon.ico")
-except Exception:
-	pass
 
 """
 
@@ -251,8 +248,11 @@ def WriteTo(filename="", content=""):
 		ShowError(message="Write To", extra="Argument 'filename' got no input")
 		return
 	
-	with open(filename, "w") as file:
-		file.write(content.replace(f'\u2192', ">"))
+	try:
+		with open(filename, "w") as file:
+			file.write(content.replace(f'\u2192', ">"))
+	except PermissionError:
+		messagebox.showerror("Permission Denied", f"Cannot write to {filename}, run script with higher permissions for writing.", parent=root)
 
 def Zip(list1, list2, zip_small=False) -> list:
 	if type(list1) != list or type(list2) != list:
@@ -341,6 +341,37 @@ def FormatSize(bytes: int=0):
 		bytes /= 1024
 	f_bytes = int(bytes) if int(bytes) == bytes else f"{bytes:.2f}"
 	return f"{f_bytes} PB"
+
+"""
+
+INITIALIZATION
+
+"""
+
+theme_file = ContentOfFile(f"{self_name}Theme.txt", "List")
+
+root = tk.Tk()
+root.withdraw()
+root.title(self_name)
+root.resizable(False, False)
+
+if not "File" in theme_file:
+	try:
+		self_theme.Config(bg=theme_file[0].strip(), fg=theme_file[1].strip(), tb_bg=theme_file[2].strip(), tb_fg=theme_file[3].strip(), insert=theme_file[4].strip())
+	except Exception:
+		pass
+
+root.config(bg=self_theme.bg)
+
+setting_variables = [tk.BooleanVar() for i in range(25)]
+for var in setting_variables:
+	var.set("0")
+
+print(self_directory)
+
+root.iconbitmap(default="Hub_Default_Icon.ico")
+root.iconbitmap("Hub_Icon.ico")
+
 
 """
 
@@ -507,14 +538,12 @@ def EditScript(filename=None) -> None:
 		function_setting = bool(setting_variables[4].get())
 		if function_setting:
 			root.iconify()
-		edit_root = Toplevel(root)
+		edit_root = Toplevel(root, bg=self_theme.bg)
+		edit_root.withdraw()
 		edit_root.title(f"{filename} Edit Window")
 		edit_root.resizable(False, False)
-		try:
-			edit_root.iconbitmap("Hub_File_Icon.ico")
-		except Exception:
-			pass
-		edit_root.focus()
+
+		edit_root.iconbitmap("Hub_File_Icon.ico")
 
 		editing_self = False
 		if filepath == self_file or filepath == self_directory + self_file:
@@ -556,7 +585,7 @@ def EditScript(filename=None) -> None:
 
 		edit_root.protocol("WM_DELETE_WINDOW", lambda: Exit())
 
-		text_widget = scrolledtext.ScrolledText(edit_root, wrap="none")
+		text_widget = scrolledtext.ScrolledText(edit_root, wrap="none", bg=self_theme.tb_bg, fg=self_theme.tb_fg, insertbackground=self_theme.insert)
 		if denied:
 			text_widget.insert(tk.END, Centered(content_str, newline=11, length=80))
 		else:
@@ -598,6 +627,9 @@ def EditScript(filename=None) -> None:
 
 		func_dropdown = tk.OptionMenu(edit_root, selected_func, *functions, command=PulseFuncDrop)
 		func_dropdown.grid(row=0, column=4, pady=10)
+
+		func_dropdown.configure(background=self_theme.bg, foreground=self_theme.fg)
+		func_dropdown["menu"].configure(bg=self_theme.bg, fg=self_theme.fg)
 			
 		def FindLine(index:int=None) -> None:
 			line_index = index
@@ -669,19 +701,19 @@ def EditScript(filename=None) -> None:
 			edit_root.bind("<Control-,>", Prev)
 			edit_root.bind("<Control-.>", Next)
 
-		line_button = tk.Button(edit_root, text="Go To Line", command=FindLine, width=20)
+		line_button = tk.Button(edit_root, text="Go To Line", command=FindLine, width=20, bg=self_theme.bg, fg=self_theme.fg)
 		line_button.grid(row=0, column=2, pady=5)
 
-		settings_button = tk.Button(edit_root, text="Settings", command=lambda: OpenSettings(_from=edit_root), width=20)
+		settings_button = tk.Button(edit_root, text="Settings", command=lambda: OpenSettings(_from=edit_root), width=20, bg=self_theme.bg, fg=self_theme.fg)
 		settings_button.grid(row=0, column=3, pady=5)
 
-		yview_label = tk.Label(edit_root, text="YView: 1", width=20)
+		yview_label = tk.Label(edit_root, text="YView: 1", width=20, bg=self_theme.bg, fg=self_theme.fg)
 		yview_label.grid(row=2, column=0, columnspan=3, pady=5)
 
-		index_label = tk.Label(edit_root, text="Line: 0 | Char: 0", width=20)
+		index_label = tk.Label(edit_root, text="Line: 0 | Char: 0", width=20, bg=self_theme.bg, fg=self_theme.fg)
 		index_label.grid(row=2, column=2, columnspan=2, pady=5)
 
-		func_count_label = tk.Label(edit_root, text=f"Func Count: {len(func_list)} | Class Count: {len(class_list)}")
+		func_count_label = tk.Label(edit_root, text=f"Func Count: {len(func_list)} | Class Count: {len(class_list)}", bg=self_theme.bg, fg=self_theme.fg)
 		func_count_label.grid(row=2, column=3, columnspan=2, pady=5)
 
 		def UpdateIndex() -> None:
@@ -770,7 +802,7 @@ def EditScript(filename=None) -> None:
 		def Info() -> None:
 			messagebox.showinfo("EditScript Info State", "EditScript Info() in developement.", parent=edit_root)
 	
-		save_button = tk.Button(edit_root, text="Save Script", command=SaveScript, width=20)
+		save_button = tk.Button(edit_root, text="Save Script", command=SaveScript, width=20, bg=self_theme.bg, fg=self_theme.fg)
 		save_button.grid(row=4, column=2, columnspan=2, pady=5)
 
 		edit_root.bind("<Control-s>", lambda e: SaveScript())
@@ -780,7 +812,7 @@ def EditScript(filename=None) -> None:
 		edit_root.bind("<Control-r>", lambda e: RestoreScript())
 		edit_root.bind("<Control-Shift-i>", lambda e: Info())
 
-		exit_button = tk.Button(edit_root, text="Exit", command=Exit, width=20)
+		exit_button = tk.Button(edit_root, text="Exit", command=Exit, width=20, bg=self_theme.bg, fg=self_theme.fg)
 		exit_button.grid(row=4, column=3, columnspan=2, pady=5)
 		
 		update_thread = threading.Thread(target=UpdateIndex)
@@ -907,9 +939,9 @@ def ListModules() -> None:
 	Log("ListModules()")
 	string = ""
 	installed = []
-	installed_packages = pkg_resources.working_set
-	for package in sorted(["%s==%s" % (i.key, i.version) for i in installed_packages]):
-	    installed.append(package[:-len(package) + package.find("=")])
+	installed_packages = importlib.metadata.distributions()
+	for dis in sorted(installed_packages, key=lambda x: x.metadata["Name"]):
+		installed.append(dis.metadata["Name"])
 
 	i = 0
 	while True:
@@ -967,15 +999,15 @@ def OpenSettings(page:int=0, update:bool=False, _from=root) -> None:
 	Log(f"OpenSettings(page={page}, update={update}, _from={_from})")
 	_from.iconify()
 	settings_root = Toplevel(_from)
+	settings_root.withdraw()
 	settings_root.title("Hub Settings")
 	settings_root.resizable(False, False)
-	settings_root.focus()
-	try:
-		settings_root.iconbitmap("Hub_Settings_Icon.ico")
-	except Exception:
-		pass
+	settings_root.config(bg=self_theme.bg)
+
+	settings_root.iconbitmap("Hub_Settings_Icon.ico")
 
 	def ChangePage(page:int=0) -> None:
+		settings_root.withdraw()
 		widgets = settings_root.winfo_children()
 		for widget in widgets:
 			widget.destroy()
@@ -984,10 +1016,97 @@ def OpenSettings(page:int=0, update:bool=False, _from=root) -> None:
 			ReframeToCheckboxes()
 		elif page == 1:
 			ReframeToKeybinds()
+		elif page == 2:
+			ReframeToTheme()
+		TopWindow(settings_root, hold=True)
+
+	#PAGE 2 (In Developement)
+	def ReframeToTheme() -> None:
+		def Preview() -> None:
+			settings_root.config(bg=bg_entry.get())
+			for widget in settings_root.winfo_children():
+				if isinstance(widget, tk.Entry):
+					widget.config(bg=tbbg_entry.get(), fg=tbfg_entry.get(), insertbackground=insertion_entry.get())
+					continue
+				widget.config(bg=bg_entry.get(), fg=fg_entry.get())
+		
+		def Set() -> None:
+			bg = bg_entry.get()
+			fg = fg_entry.get()
+			tb_bg = tbbg_entry.get()
+			tb_fg = tbfg_entry.get()
+			insert = insertion_entry.get()
+
+			confirmation = messagebox.askyesno("Theme Confirmation", f"Confirm New Theme?", parent=settings_root)
+			if not confirmation:
+				return
+
+			WriteTo(f"{self_name}Theme.txt", f"{bg_entry.get()}\n{fg_entry.get()}\n{tbbg_entry.get()}\n{tbfg_entry.get()}\n{insertion_entry.get()}")
+			Refresh()
+
+		label = tk.Label(settings_root, text=f"(SAVING WILL REFRESH THE HUB)", bg=self_theme.bg, fg=self_theme.fg)
+		label.grid(row=0, column=0, columnspan=3, padx=10, pady=10)
+
+		bg_label = tk.Label(settings_root, text="Window Background Color", bg=self_theme.bg, fg=self_theme.fg)
+		bg_label.grid(row=1, column=0, columnspan=3, padx=10, pady=10)
+
+		bg_entry = tk.Entry(settings_root)
+		bg_entry.grid(row=2, column=1, padx=10, pady=10)
+		bg_entry.insert(tk.END, self_theme.bg)
+
+		fg_label = tk.Label(settings_root, text="Window Foreground Color", bg=self_theme.bg, fg=self_theme.fg)
+		fg_label.grid(row=3, column=0, columnspan=3, padx=10, pady=10)
+
+		fg_entry = tk.Entry(settings_root)
+		fg_entry.grid(row=4, column=1, padx=10, pady=10)
+		fg_entry.insert(tk.END, self_theme.fg)
+
+		tbbg_label = tk.Label(settings_root, text="Textbox Background Color", bg=self_theme.bg, fg=self_theme.fg)
+		tbbg_label.grid(row=5, column=0, columnspan=3, padx=10, pady=10)
+
+		tbbg_entry = tk.Entry(settings_root)
+		tbbg_entry.grid(row=6, column=1, padx=10, pady=10)
+		tbbg_entry.insert(tk.END, self_theme.tb_bg)
+
+		tbfg_label = tk.Label(settings_root, text="Textbox Foreground Color", bg=self_theme.bg, fg=self_theme.fg)
+		tbfg_label.grid(row=7, column=0, columnspan=3, padx=10, pady=10)
+
+		tbfg_entry = tk.Entry(settings_root)
+		tbfg_entry.grid(row=8, column=1, padx=10, pady=10)
+		tbfg_entry.insert(tk.END, self_theme.tb_fg)
+
+		insertion_label = tk.Label(settings_root, text="Textbox Insert Color", bg=self_theme.bg, fg=self_theme.fg)
+		insertion_label.grid(row=9, column=0, columnspan=3, padx=10, pady=10)
+
+		insertion_entry = tk.Entry(settings_root)
+		insertion_entry.grid(row=10, column=1, padx=10, pady=10)
+		insertion_entry.insert(tk.END, self_theme.tb_fg)
+
+		def EnterDefault() -> None:
+			entries = [bg_entry, fg_entry, tbbg_entry, tbfg_entry, insertion_entry]
+			defaults = ["gray94", "black", "white", "black", "black"]
+			for index, entry in enumerate(entries):
+				entry.delete(0, tk.END)
+				entry.insert(tk.END, defaults[index])
+
+		def Back() -> None:
+			settings_root.config(bg=self_theme.bg)
+			ChangePage(1)
+
+		keybinds_button = tk.Button(settings_root, text="<- Keybinds (Page 1)", command=lambda: Back(), bg=self_theme.bg, fg=self_theme.fg)
+		keybinds_button.grid(row=11, column=1, padx=5, pady=5)
+
+		default_button = tk.Button(settings_root, text="Enter Default", command=EnterDefault, bg=self_theme.bg, fg=self_theme.fg)
+		default_button.grid(row=12, column=1, padx=5, pady=5)
+
+		preview_button = tk.Button(settings_root, text="Preview", command=Preview, bg=self_theme.bg, fg=self_theme.fg)
+		preview_button.grid(row=13, column=0, padx=5, pady=5)
+
+		save_button = tk.Button(settings_root, text="Save", command=Set, bg=self_theme.bg, fg=self_theme.fg)
+		save_button.grid(row=13, column=2, padx=5, pady=5)
 	
-	#PAGE 1
+	#PAGE 1 (In Developement)
 	def ReframeToKeybinds() -> None:
-		#In Developement
 		def Set() -> None:
 			...
 
@@ -1002,23 +1121,26 @@ def OpenSettings(page:int=0, update:bool=False, _from=root) -> None:
 			Set()
 			Exit()
 
-		syntax_label = tk.Label(settings_root, text="EXAMPLE: 'Control-Shift-b' (In Developement)")
+		syntax_label = tk.Label(settings_root, text="EXAMPLE: 'Control-Shift-b' (In Developement)", bg=self_theme.bg, fg=self_theme.fg)
 		syntax_label.grid(row=0, column=0,columnspan=6, padx=10, pady=5)
 
-		list_module_label = tk.Label(settings_root, text="Keybind To List All Modules In The Textbox")
+		list_module_label = tk.Label(settings_root, text="Keybind To List All Modules In The Textbox", bg=self_theme.bg, fg=self_theme.fg)
 		list_module_label.grid(row=1, column=0,columnspan=6, padx=10, pady=5)
 
 		list_modules_keybind = tk.Entry(settings_root)
 		list_modules_keybind.grid(row=2, column=0, columnspan=6, padx=10, pady=10)
 
-		settings_id_button = tk.Button(settings_root, text="<- Checkboxes (Page 0)", command=lambda: ChangePage(0))
-		settings_id_button.grid(row=4, column=2, padx=5, pady=5)
-		
-		save_exit_button = tk.Button(settings_root, text="Save and Exit", command=SaveExit)
-		save_exit_button.grid(row=5, column=2, padx=5, pady=5)
+		checkbox_button = tk.Button(settings_root, text="<- Checkboxes (Page 0)", command=lambda: ChangePage(0), bg=self_theme.bg, fg=self_theme.fg)
+		checkbox_button.grid(row=4, column=2, padx=5, pady=5)
 
-		exit_button = tk.Button(settings_root, text="Exit", command=Exit)
-		exit_button.grid(row=5, column=3, padx=5, pady=5)	
+		theme_button = tk.Button(settings_root, text="-> Theme Change (Page 2)", command=lambda: ChangePage(2), bg=self_theme.bg, fg=self_theme.fg)
+		theme_button.grid(row=5, column=2, padx=5, pady=5)
+		
+		save_exit_button = tk.Button(settings_root, text="Save and Exit", command=SaveExit, bg=self_theme.bg, fg=self_theme.fg)
+		save_exit_button.grid(row=6, column=2, padx=5, pady=5)
+
+		exit_button = tk.Button(settings_root, text="Exit", command=Exit, bg=self_theme.bg, fg=self_theme.fg)
+		exit_button.grid(row=6, column=3, padx=5, pady=5)	
 
 	#PAGE 0
 	def ReframeToCheckboxes() -> None:
@@ -1068,46 +1190,46 @@ def OpenSettings(page:int=0, update:bool=False, _from=root) -> None:
 			Exit()
 			ChangePage(page)
 
-		auto_confirm_list_scripts_checkbox = tk.Checkbutton(settings_root, text="Auto confirm Python Exclusivity for 'List Files' keybind", variable=setting_variables[0], command=SignalUpdate)
+		auto_confirm_list_scripts_checkbox = tk.Checkbutton(settings_root, text="Auto confirm Python Exclusivity for 'List Files' keybind", variable=setting_variables[0], command=SignalUpdate, bg=self_theme.bg, fg=self_theme.fg, selectcolor=self_theme.bg)
 		auto_confirm_list_scripts_checkbox.grid(row=0, column=0, columnspan=6, padx=10, pady=10)
 
-		auto_deny_see_code_checkbox = tk.Checkbutton(settings_root, text="Auto Deny Copy to Clipboard for 'See Code'", variable=setting_variables[1], command=SignalUpdate)
+		auto_deny_see_code_checkbox = tk.Checkbutton(settings_root, text="Auto Deny Copy to Clipboard for 'See Code'", variable=setting_variables[1], command=SignalUpdate, bg=self_theme.bg, fg=self_theme.fg, selectcolor=self_theme.bg)
 		auto_deny_see_code_checkbox.grid(row=1, column=0, columnspan=6, padx=10, pady=10)
 
-		auto_confirm_backup_checkbox = tk.Checkbutton(settings_root, text="Auto Confirm Backup Saving", variable=setting_variables[2], command=SignalUpdate)
+		auto_confirm_backup_checkbox = tk.Checkbutton(settings_root, text="Auto Confirm Backup Saving", variable=setting_variables[2], command=SignalUpdate, bg=self_theme.bg, fg=self_theme.fg, selectcolor=self_theme.bg)
 		auto_confirm_backup_checkbox.grid(row=2, column=0, columnspan=6, padx=10, pady=10)
 
-		auto_confirm_save_checkbox = tk.Checkbutton(settings_root, text="Auto Confirm Saving In Edit", variable=setting_variables[3], command=SignalUpdate)
+		auto_confirm_save_checkbox = tk.Checkbutton(settings_root, text="Auto Confirm Saving In Edit", variable=setting_variables[3], command=SignalUpdate, bg=self_theme.bg, fg=self_theme.fg, selectcolor=self_theme.bg)
 		auto_confirm_save_checkbox.grid(row=3, column=0, columnspan=6, padx=10, pady=10)
 
-		edit_iconify_checkbox = tk.Checkbutton(settings_root, text="Iconify Root When Editing Script", variable=setting_variables[4], command=SignalUpdate)
+		edit_iconify_checkbox = tk.Checkbutton(settings_root, text="Iconify Root When Editing Script", variable=setting_variables[4], command=SignalUpdate, bg=self_theme.bg, fg=self_theme.fg, selectcolor=self_theme.bg)
 		edit_iconify_checkbox.grid(row=4, column=0, columnspan=6, padx=10, pady=10)
 
-		log_checkbox = tk.Checkbutton(settings_root, text="Hub Logs", variable=setting_variables[5], command=SignalUpdate)
+		log_checkbox = tk.Checkbutton(settings_root, text="Hub Logs", variable=setting_variables[5], command=SignalUpdate, bg=self_theme.bg, fg=self_theme.fg, selectcolor=self_theme.bg)
 		log_checkbox.grid(row=5, column=0, columnspan=6, padx=10, pady=10)
 
-		file_info_checkbox = tk.Checkbutton(settings_root, text="Show File Info On Select", variable=setting_variables[6], command=SignalUpdate)
+		file_info_checkbox = tk.Checkbutton(settings_root, text="Show File Info On Select", variable=setting_variables[6], command=SignalUpdate, bg=self_theme.bg, fg=self_theme.fg, selectcolor=self_theme.bg)
 		file_info_checkbox.grid(row=6, column=0, columnspan=6, padx=10, pady=10)
 
-		edit_self_checkbox = tk.Checkbutton(settings_root, text="Refresh On Exit If Editing Self", variable=setting_variables[7], command=SignalUpdate)
+		edit_self_checkbox = tk.Checkbutton(settings_root, text="Refresh On Exit If Editing Self", variable=setting_variables[7], command=SignalUpdate, bg=self_theme.bg, fg=self_theme.fg, selectcolor=self_theme.bg)
 		edit_self_checkbox.grid(row=7, column=0, columnspan=6, padx=10, pady=10)
 
-		icon_run_checkbox = tk.Checkbutton(settings_root, text="Iconify Root When Running", variable=setting_variables[8], command=SignalUpdate)
+		icon_run_checkbox = tk.Checkbutton(settings_root, text="Iconify Root When Running", variable=setting_variables[8], command=SignalUpdate, bg=self_theme.bg, fg=self_theme.fg, selectcolor=self_theme.bg)
 		icon_run_checkbox.grid(row=8, column=0, columnspan=6, padx=10, pady=10)
 
-		settings_id_label = tk.Label(settings_root, text=f"Settings ID: {BinaryIn("".join(str(int(val.get())) for val in setting_variables))}")
+		settings_id_label = tk.Label(settings_root, text=f"Settings ID: {BinaryIn("".join(str(int(val.get())) for val in setting_variables))}", bg=self_theme.bg, fg=self_theme.fg)
 		settings_id_label.grid(row=9, column=0, columnspan=6, padx=5, pady=5)
 	
-		settings_id_button = tk.Button(settings_root, text="Input Settings ID", command=InputID)
+		settings_id_button = tk.Button(settings_root, text="Input Settings ID", command=InputID, bg=self_theme.bg, fg=self_theme.fg)
 		settings_id_button.grid(row=10, column=2, columnspan=2, padx=5, pady=5)
 
-		keybinds_button = tk.Button(settings_root, text="-> Keybinds (Page 1)", command=lambda: ChangePage(1))
+		keybinds_button = tk.Button(settings_root, text="-> Keybinds (Page 1)", command=lambda: ChangePage(1), bg=self_theme.bg, fg=self_theme.fg)
 		keybinds_button.grid(row=11, column=2, columnspan=2, padx=5, pady=5)
 
-		save_exit_button = tk.Button(settings_root, text="Save and Exit", command=SaveExit)
+		save_exit_button = tk.Button(settings_root, text="Save and Exit", command=SaveExit, bg=self_theme.bg, fg=self_theme.fg)
 		save_exit_button.grid(row=12, column=2, padx=5, pady=5)
 
-		exit_button = tk.Button(settings_root, text="Exit", command=Exit)
+		exit_button = tk.Button(settings_root, text="Exit", command=Exit, bg=self_theme.bg, fg=self_theme.fg)
 		exit_button.grid(row=12, column=3, padx=5, pady=5)
 
 		update_thread = threading.Thread(target=UpdateId)
@@ -1280,14 +1402,11 @@ def UpdateScripts() -> None:
 
 def LaunchCommandWindow() -> None:
 	Log("LaunchCommandWindow()")
-	command_root = Toplevel(root)
+	command_root = Toplevel(root, bg=self_theme.bg)
 	command_root.title(f"{self_name} Command Window")
 	command_root.resizable(False, False)
-	try:
-		command_root.iconbitmap("Hub_Command_Icon.ico")
-	except Exception:
-		pass
-	#command_root.config(bg="gray")
+
+	command_root.iconbitmap("Hub_Command_Icon.ico")
 	command_root.focus()
 
 	root.iconify()
@@ -1295,7 +1414,7 @@ def LaunchCommandWindow() -> None:
 	#info_label = tk.Label(command_root, text="Control-Left -> prev/Control-Right -> next in history (In Developement)")
 	#info_label.grid(row=0, column=3, padx=10, pady=10)
 
-	text_widget = scrolledtext.ScrolledText(command_root, wrap="none", height=10, width=45)
+	text_widget = scrolledtext.ScrolledText(command_root, wrap="none", height=10, width=45, bg=self_theme.tb_bg, fg=self_theme.tb_fg, insertbackground=self_theme.insert)
 	text_widget.grid(row=1, column=0, columnspan=3, padx=10, pady=10)
 
 	def Run() -> None:
@@ -1341,13 +1460,13 @@ def LaunchCommandWindow() -> None:
 	def PrevHistory() -> None:
 		...
 
-	run_button = tk.Button(command_root, text="Run Command", command=Run)
+	run_button = tk.Button(command_root, text="Run Command", command=Run, bg=self_theme.bg, fg=self_theme.fg)
 	run_button.grid(row=2, column=0, padx=10, pady=10)
 
-	run_exit_button = tk.Button(command_root, text="Run & Exit", command=RunExit)
+	run_exit_button = tk.Button(command_root, text="Run & Exit", command=RunExit, bg=self_theme.bg, fg=self_theme.fg)
 	run_exit_button.grid(row=2, column=1, padx=10, pady=10)
 
-	exit_button = tk.Button(command_root, text="Exit Window", command=Exit)
+	exit_button = tk.Button(command_root, text="Exit Window", command=Exit, bg=self_theme.bg, fg=self_theme.fg)
 	exit_button.grid(row=2, column=2, padx=10, pady=10)
 
 	command_root.protocol("WM_DELETE_WINDOW", lambda: Exit())
@@ -1415,43 +1534,46 @@ selected_script.set("Select a script" if open_file == None else opened_filename)
 script_dropdown = tk.OptionMenu(root, selected_script, *scripts.keys(), command=OnScriptSelection)
 script_dropdown.grid(row=0, column=0, columnspan=2, padx=10, pady=10)
 
-script_precise_button = tk.Button(root, text="Select From Drive", command=DriveSelect, width=20)
+script_dropdown.configure(background=self_theme.bg, foreground=self_theme.fg)
+script_dropdown["menu"].configure(bg=self_theme.bg, fg=self_theme.fg)
+
+script_precise_button = tk.Button(root, text="Select From Drive", command=DriveSelect, width=20, bg=self_theme.bg, fg=self_theme.fg)
 script_precise_button.grid(row=0, column=0, padx=10, pady=10)
 
-settings_button = tk.Button(root, text="Settings", command=OpenSettings, width=20)
+settings_button = tk.Button(root, text="Settings", command=OpenSettings, width=20, bg=self_theme.bg, fg=self_theme.fg)
 settings_button.grid(row=0, column=1, columnspan=2, padx=10, pady=10)
 
-textbox = scrolledtext.ScrolledText(root, wrap=tk.WORD, width=Length, height=Height)
+textbox = scrolledtext.ScrolledText(root, wrap=tk.WORD, width=Length, height=Height, bg=self_theme.tb_bg, fg=self_theme.tb_fg, insertbackground=self_theme.insert)
 textbox.grid(row=1, column=0, columnspan=2, padx=10, pady=10)
 
-create_button = tk.Button(root, text="Create File", command=CreateScript, width=20)
+create_button = tk.Button(root, text="Create File", command=CreateScript, width=20, bg=self_theme.bg, fg=self_theme.fg)
 create_button.grid(row=3, column=0, columnspan=2, padx=5)
 
-see_code_button = tk.Button(root, text="See Contents", command=SeeCode, width=20, state=tk.DISABLED)
+see_code_button = tk.Button(root, text="See Contents", command=SeeCode, width=20, state=tk.DISABLED, bg=self_theme.bg, fg=self_theme.fg)
 see_code_button.grid(row=3, column=0, padx=5)
 
-run_button = tk.Button(root, text="Open Selected File", command=RunScript, width=20, state=tk.DISABLED)
+run_button = tk.Button(root, text="Open Selected File", command=RunScript, width=20, state=tk.DISABLED, bg=self_theme.bg, fg=self_theme.fg)
 run_button.grid(row=3, column=1, padx=5)
 
-command_window_button = tk.Button(root, text="Command Window", command=LaunchCommandWindow, width=20)
+command_window_button = tk.Button(root, text="Command Window", command=LaunchCommandWindow, width=20, bg=self_theme.bg, fg=self_theme.fg)
 command_window_button.grid(row=4, column=0, columnspan=2, padx=5)
 
-dropdown_button = tk.Button(root, text="Manipulate Dropdown", command=DropdownManipulation, width=20, state=tk.DISABLED)
+dropdown_button = tk.Button(root, text="Manipulate Dropdown", command=DropdownManipulation, width=20, state=tk.DISABLED, bg=self_theme.bg, fg=self_theme.fg)
 dropdown_button.grid(row=5, column=0, columnspan=2, padx=5)
 
-edit_button = tk.Button(root, text="Edit File", command=EditScript, width=20, state=tk.DISABLED)
+edit_button = tk.Button(root, text="Edit File", command=EditScript, width=20, state=tk.DISABLED, bg=self_theme.bg, fg=self_theme.fg)
 edit_button.grid(row=5, column=1, padx=5)
 
-close_button = tk.Button(root, text="Close Running", command=CloseScript, width=20, state=tk.DISABLED)
+close_button = tk.Button(root, text="Close Running", command=CloseScript, width=20, state=tk.DISABLED, bg=self_theme.bg, fg=self_theme.fg)
 close_button.grid(row=4, column=1, padx=5)
 
-install_button = tk.Button(root, text="Install Module", command=ModuleManipulation, width=20)
+install_button = tk.Button(root, text="Install Module", command=ModuleManipulation, width=20, bg=self_theme.bg, fg=self_theme.fg)
 install_button.grid(row=4, column=0, padx=5)
 
-backup_button = tk.Button(root, text="Backup Hub", command=Backup, width=20)
+backup_button = tk.Button(root, text="Backup Hub", command=Backup, width=20, bg=self_theme.bg, fg=self_theme.fg)
 backup_button.grid(row=5, column=0, padx=5)
 
-refresh_button = tk.Button(root, text="Refresh", command=Refresh, width=20)
+refresh_button = tk.Button(root, text="Refresh", command=Refresh, width=20, bg=self_theme.bg, fg=self_theme.fg)
 refresh_button.grid(row=6, column=0, columnspan=2, padx=5)
 
 root.bind("<Control-m>", lambda event: ListModules())
@@ -1469,7 +1591,6 @@ keyboard.add_hotkey("ctrl+shift+h", lambda: TopWindow(root))
 
 if open_file != None:
 	OnScriptSelection(opened_filename)
-	SeeCode()
 
 TopWindow(root, hold=True)
 root.focus()
