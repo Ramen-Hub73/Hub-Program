@@ -963,7 +963,7 @@ def ApplySettings() -> None:
 	setting_file_content = ContentOfFile(f"{self_name}Settings.txt").strip()
 	disregard = setting_file_content.endswith("File")
 	if disregard:
-		settings_string = "0" * 25
+		settings_string = "00000111010000000000000000"
 	else:
 		settings_string = setting_file_content
 	for index, value in enumerate(settings_string):
