@@ -36,6 +36,7 @@ class Theme:
 		self.fg = fg
 		self.tb_bg = tb_bg
 		self.tb_fg = tb_fg
+		self.insert = insert
 
 	def Config(self, bg="gray94", fg="black", tb_bg="white", tb_fg="black", insert="black"):
 		self.bg = bg
