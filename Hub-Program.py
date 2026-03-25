@@ -422,10 +422,10 @@ def SeeCode(filename=None) -> None:
 			denied = True
 		if denied:
 			Input(Centered(text, newline=14))
-			textbox.config(state="disabled", bg="light gray")
+			textbox.config(state="disabled")
 			Update()
 			time.sleep(3)
-			textbox.config(state="normal", bg="white")
+			textbox.config(state="normal")
 			Delete()	
 		else:
 			Input(text)
@@ -591,13 +591,13 @@ def EditScript(filename=None) -> None:
 			text_widget.insert(tk.END, Centered(content_str, newline=11, length=80))
 		else:
 			text_widget.insert(tk.END, content_str)
-		text_widget.grid(row=3, column=0, columnspan=6, padx=5, pady=5)
+		text_widget.grid(row=4, column=0, columnspan=6, padx=5, pady=5)
 
 		text_widget.focus()
 		text_widget.mark_set("insert", "1.0")
 
 		if denied:
-			text_widget.config(state="disabled", bg="light gray")
+			text_widget.config(state="disabled")
 			updating = False
 
 		selected_func = tk.StringVar()
@@ -627,7 +627,7 @@ def EditScript(filename=None) -> None:
 			func_drop_change = True
 
 		func_dropdown = tk.OptionMenu(edit_root, selected_func, *functions, command=PulseFuncDrop)
-		func_dropdown.grid(row=0, column=4, pady=10)
+		func_dropdown.grid(row=1, column=2, columnspan=2, pady=10)
 
 		func_dropdown.configure(background=self_theme.bg, foreground=self_theme.fg)
 		func_dropdown["menu"].configure(bg=self_theme.bg, fg=self_theme.fg)
@@ -709,13 +709,13 @@ def EditScript(filename=None) -> None:
 		settings_button.grid(row=0, column=3, pady=5)
 
 		yview_label = tk.Label(edit_root, text="YView: 1", width=20, bg=self_theme.bg, fg=self_theme.fg)
-		yview_label.grid(row=2, column=0, columnspan=3, pady=5)
+		yview_label.grid(row=3, column=0, columnspan=3, pady=5)
 
 		index_label = tk.Label(edit_root, text="Line: 0 | Char: 0", width=20, bg=self_theme.bg, fg=self_theme.fg)
-		index_label.grid(row=2, column=2, columnspan=2, pady=5)
+		index_label.grid(row=3, column=2, columnspan=2, pady=5)
 
 		func_count_label = tk.Label(edit_root, text=f"Func Count: {len(func_list)} | Class Count: {len(class_list)}", bg=self_theme.bg, fg=self_theme.fg)
-		func_count_label.grid(row=2, column=3, columnspan=2, pady=5)
+		func_count_label.grid(row=3, column=3, columnspan=2, pady=5)
 
 		def UpdateIndex() -> None:
 			global func_drop_change
@@ -804,7 +804,7 @@ def EditScript(filename=None) -> None:
 			messagebox.showinfo("EditScript Info State", "EditScript Info() in developement.", parent=edit_root)
 	
 		save_button = tk.Button(edit_root, text="Save Script", command=SaveScript, width=20, bg=self_theme.bg, fg=self_theme.fg)
-		save_button.grid(row=4, column=2, columnspan=2, pady=5)
+		save_button.grid(row=5, column=2, columnspan=1, pady=5)
 
 		edit_root.bind("<Control-s>", lambda e: SaveScript())
 		edit_root.bind("<Control-f>", lambda e: FindString())
@@ -814,7 +814,7 @@ def EditScript(filename=None) -> None:
 		edit_root.bind("<Control-Shift-i>", lambda e: Info())
 
 		exit_button = tk.Button(edit_root, text="Exit", command=Exit, width=20, bg=self_theme.bg, fg=self_theme.fg)
-		exit_button.grid(row=4, column=3, columnspan=2, pady=5)
+		exit_button.grid(row=5, column=3, columnspan=1, pady=5)
 		
 		update_thread = threading.Thread(target=UpdateIndex)
 		update_thread.daemon = True
@@ -963,7 +963,7 @@ def ApplySettings() -> None:
 	setting_file_content = ContentOfFile(f"{self_name}Settings.txt").strip()
 	disregard = setting_file_content.endswith("File")
 	if disregard:
-		settings_string = "00000111010000000000000000"
+		settings_string = "0" * 25
 	else:
 		settings_string = setting_file_content
 	for index, value in enumerate(settings_string):
@@ -1184,8 +1184,11 @@ def OpenSettings(page:int=0, update:bool=False, _from=root) -> None:
 		def InputID() -> None:
 			id = simpledialog.askinteger("Settings ID Input", "Input the desired ID.", parent=settings_root)
 			binary_str = BinaryOut(id)
-			for index, setting_object in enumerate(setting_variables):
-				setting_object.set(int(binary_str[index]))
+			try:
+				for index, setting_object in enumerate(setting_variables):
+					setting_object.set(int(binary_str[index]))
+			except Exception:
+				pass
 
 		def Flip(page:int=0) -> None:
 			Exit()
@@ -1481,6 +1484,8 @@ def WebSearch() -> None:
 	for end in site_endings:
 		if end in query:
 			end_in += 1
+
+	Log(f'Searched On Web "{query}"')
 
 	if end_in == 0:
 		query = f"www.google.com/search?q={query.replace(' ', '+')}&oq={query.replace(' ', '+')}&gs_lcrp=EgRlZGdlKgYIABBFGDkyBggAEEUYOTIHCAEQ6wcYQNIBBzE2M2owajGoAgCwAgE&sourceid=chrome&ie=UTF-8&sei=g_G9abexMabJkPIP-si6oAc"
