@@ -15,20 +15,21 @@ from datetime import datetime
 import ast
 import webbrowser
 
+log_limit = 250
+
+print(f"\nIntialization |Backend")
+
 if 'win' in sys.platform:
 	ctypes.windll.shcore.SetProcessDpiAwareness(2)
 
 try:
 	open_file = sys.argv[1]
-	print(f"Opening: {open_file}")
 except Exception:
 	open_file = None
 
 self_file = __file__[len(__file__) - __file__[::-1].find("\\"):]
 self_name = f"{self_file.replace('.py', '')}"
 platform = sys.platform
-
-print(self_file, self_name, platform)
 
 class Theme:
 	def __init__(self, bg="gray94", fg="black", tb_bg="white", tb_fg="black", insert="black"):
@@ -51,6 +52,8 @@ command_history = []
 run = None
 absolute_filepath = open_file
 self_directory = os.path.dirname(os.path.realpath(__file__))
+
+print(f"Opening: {open_file}\nFile: {self_file}\nPlatform: {platform}\nDirectory: {self_directory}\n")
 
 """
 
@@ -96,8 +99,8 @@ def Log(entry:str="DefaultLogEntry", type:str="ACCESS", time_log=False) -> None:
 	if treat_as_new:
 		WriteTo(log_file, log)
 	else:
-		if len(cof_out) >= 500:
-			cof_out.pop(0)
+		if len(cof_out) >= log_limit:
+			cof_out = cof_out[len(cof_out) - log_limit:]
 		cof_out.append(log)
 		WriteTo(log_file, "".join(cof_out))
 
@@ -251,7 +254,7 @@ def WriteTo(filename="", content=""):
 	
 	try:
 		with open(filename, "w") as file:
-			file.write(content.replace(f'\u2192', ">"))
+			file.write(content)
 	except PermissionError:
 		messagebox.showerror("Permission Denied", f"Cannot write to {filename}, run script with higher permissions for writing.", parent=root)
 
@@ -345,9 +348,11 @@ def FormatSize(bytes: int=0):
 
 """
 
-INITIALIZATION
+INITIALIZATION PART 1
 
 """
+
+print(f"Initialization Backend|Frontend (Themes and such)")
 
 theme_file = ContentOfFile(f"{self_name}Theme.txt", "List")
 
@@ -368,10 +373,10 @@ setting_variables = [tk.BooleanVar() for i in range(25)]
 for var in setting_variables:
 	var.set("0")
 
-print(self_directory)
-
 root.iconbitmap(default="Hub_Default_Icon.ico")
 root.iconbitmap("Hub_Icon.ico")
+
+print(f"Theme: Set\nSettings: Set\n")
 
 
 """
@@ -426,7 +431,7 @@ def SeeCode(filename=None) -> None:
 			Update()
 			time.sleep(3)
 			textbox.config(state="normal")
-			Delete()	
+			Delete()
 		else:
 			Input(text)
 		function_setting = bool(setting_variables[1].get())
@@ -469,8 +474,8 @@ def RunScript(filename=None) -> None:
 		keyboard.remove_hotkey("esc")
 
 		Delete()
-		Input(Centered(f"Output for {filename}", "=", end=True, end_line=3))
-		Input(f"{result}\n\n\n{Centered("Error Output", "=", end=True)}\n\n\n{error}\n\n\n")
+		Input(Centered(f"Output from {filename}", "=", end=True, end_line=3))
+		Input(f"{result}\n\n\n{Centered(f"Error(s) from {filename}", "=", end=True)}\n\n\n{error}\n\n\n")
 		root.attributes('-topmost', True)
 		root.update_idletasks()
 		root.attributes('-topmost', False)
@@ -526,8 +531,7 @@ def ListScripts() -> None:
 			string += Centered(file, cuts=3, end=True, newline=2)
 		else:
 			string += Centered(file, cuts=3, end=True)
-	Delete()
-	Input(string)
+	Show(string)
 
 def EditScript(filename=None) -> None:
 	Log(f"EditScript(filename={filename})")
@@ -652,7 +656,10 @@ def EditScript(filename=None) -> None:
 			from_user = True
 			if string != None:
 				from_user = False
-			string = string if string != None else simpledialog.askstring("Find Input", "What would you like to search for?", parent=edit_root).strip()
+			string = string if string != None else simpledialog.askstring("Find Input", "What would you like to search for?", parent=edit_root)
+
+			if string != None:
+				string = string.strip()
 
 			indexes = []
 			#Optimization needed
@@ -709,13 +716,13 @@ def EditScript(filename=None) -> None:
 		settings_button.grid(row=0, column=3, pady=5)
 
 		yview_label = tk.Label(edit_root, text="YView: 1", width=20, bg=self_theme.bg, fg=self_theme.fg)
-		yview_label.grid(row=3, column=0, columnspan=3, pady=5)
+		yview_label.grid(row=3, column=0, columnspan=3, pady=5, padx=10)
 
 		index_label = tk.Label(edit_root, text="Line: 0 | Char: 0", width=20, bg=self_theme.bg, fg=self_theme.fg)
-		index_label.grid(row=3, column=2, columnspan=2, pady=5)
+		index_label.grid(row=3, column=2, columnspan=2, pady=5, padx=10)
 
 		func_count_label = tk.Label(edit_root, text=f"Func Count: {len(func_list)} | Class Count: {len(class_list)}", bg=self_theme.bg, fg=self_theme.fg)
-		func_count_label.grid(row=3, column=3, columnspan=2, pady=5)
+		func_count_label.grid(row=3, column=3, columnspan=2, pady=5, padx=10)
 
 		def UpdateIndex() -> None:
 			global func_drop_change
@@ -727,10 +734,13 @@ def EditScript(filename=None) -> None:
 					except Exception:
 						index = None
 					if index != None:
-						text_widget.yview(index - 11)
-						text_widget.update()
-						text_widget.mark_set("insert", f"{index + 1}.0")
-						text_widget.focus()
+						try:
+							text_widget.yview(index - 11)
+							text_widget.update()
+							text_widget.mark_set("insert", f"{index + 1}.0")
+							text_widget.focus()
+						except Exception as e:
+							print("(EditScript) UpdateIndex() Unexpected Failure.\n{str(e)}")
 					else:
 						selected_func.set("No Func/Class Detected")
 					func_drop_change = False
@@ -828,8 +838,8 @@ def EditScript(filename=None) -> None:
 		messagebox.showerror("File Not Found", f"The file {filename} was not found.", parent=root)
 
 def Refresh() -> None:
-	Log("Refresh()")
-	CloseHub()
+	Log("REFRESH", type="SYSTEM")
+	WriteTo(f"{self_name}Condition.txt", f"{absolute_filepath}\n{self_name}\n{self_directory}")
 	python = sys.executable
 	os.execl(python, python, self_file)
 
@@ -890,33 +900,23 @@ def DropdownManipulation() -> None:
 
 def ModuleManipulation() -> None:
 	Log("ModuleManipulation()")
-	manip = simpledialog.askstring("Manipulation Input", "Would you like to install or delete a module? (Options: 'install' or 'delete')", parent=root).lower().strip()
-	module = simpledialog.askstring("Module Name Input", "What is the name of the module?", parent=root)
-	if manip == "install":
-		confirmation = messagebox.askokcancel("Module Installing", f"Installing module '{module}'...", parent=root)
-	elif manip == "delete":
-		confirmation = messagebox.askokcancel("Module Deleting", f"Deleting module '{module}'...", parent=root)
-	else:
-		messagebox.showerror("Invalid Manip", f"Manipulation '{manip}' is invalid, must be 'install' or 'delete'", parent=root)
-		return
-
-	if not confirmation:
+	module = simpledialog.askstring("Module Name Prompt", "What is the name of the module you would like to install or delete?", parent=root)
+	if module == None:
 		return
 
 	search_state = importlib.util.find_spec(module)
-	if search_state != None:
-		if manip == "delete":
-			subprocess.run(["pip", "uninstall", module])
-			messagebox.showinfo("Module Deleted", f"The module '{module}' has been deleted.", parent=root)
+	if search_state == None:
+		confirmation = messagebox.askyesno("Module Installation Prompt", f"Install {module}? (Not Found)", parent=root)
+		if not confirmation:
 			return
-		messagebox.showinfo("Module Already Installed", f"The module '{module}' is already installed.", parent=root)
-		return
-	installation = subprocess.run(["pip", "install", module], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-	result, error = installation.communicate()
-	if result != 0:
-		messagbox.showerror("Module Installation Error", error, parent=root)
-		return
-	messagbox.showinfo("Module Installation Success", f"Successfully installed module '{module}'!", parent=root)
+		subprocess.run(f"pip install {module}", shell=True)
+		messagebox.showinfo("Command Complete", "Command to install either failed or succeeded, it's done now.", parent=root)
+	else:
+		confirmation = messagebox.askyesno("Module Deletion Prompt", f"Delete {module}? (Already Installed)", parent=root)
+		if not confirmation:
+			return
+		subprocess.run(f"pip uninstall {module} -y", shell=True)
+		messagebox.showinfo("Command Complete", "Command to delete either failed or succeeded, it's done now.", parent=root)
 
 def Backup() -> None:
 	Log("Backup()", type="SYSTEM", time_log=True)
@@ -936,7 +936,7 @@ def Backup() -> None:
 		messagebox.showinfo("Backup Complete", "Successfully backed up Hub to Hub_Backup.py.", parent=root)
 	TopWindow(root, hold=True)
 
-def ListModules() -> None:
+def ListModules(event=None) -> None:
 	Log("ListModules()")
 	string = ""
 	installed = []
@@ -954,7 +954,7 @@ def ListModules() -> None:
 			string += Centered(installed[0], cuts=3, end=True)
 		installed.pop(0)
 		i += 1
-	Input(string)
+	Show(string)
 
 def ApplySettings() -> None:
 	Log("ApplySettings()")
@@ -1090,11 +1090,7 @@ def OpenSettings(page:int=0, update:bool=False, _from=root) -> None:
 				entry.delete(0, tk.END)
 				entry.insert(tk.END, defaults[index])
 
-		def Back() -> None:
-			settings_root.config(bg=self_theme.bg)
-			ChangePage(1)
-
-		keybinds_button = tk.Button(settings_root, text="<- Keybinds (Page 1)", command=lambda: Back(), bg=self_theme.bg, fg=self_theme.fg)
+		keybinds_button = tk.Button(settings_root, text="<- Keybinds (Page 1)", command=lambda: (root.config(bg=self_theme.bg), ChangePage(1)), bg=self_theme.bg, fg=self_theme.fg)
 		keybinds_button.grid(row=11, column=1, padx=5, pady=5)
 
 		default_button = tk.Button(settings_root, text="Enter Default", command=EnterDefault, bg=self_theme.bg, fg=self_theme.fg)
@@ -1108,8 +1104,32 @@ def OpenSettings(page:int=0, update:bool=False, _from=root) -> None:
 	
 	#PAGE 1 (In Developement)
 	def ReframeToKeybinds() -> None:
-		def Set() -> None:
-			...
+		def Set() -> bool:
+			entries = [list_modules_keybind]
+			bind_commands = [ListModules]
+			defaults = ["Control-m"]
+			failed = []
+			binds_str = ""
+			for index, entry in enumerate(entries):
+				try:
+					input = entry.get().strip()
+					command = bind_commands[index]
+					root.bind(f"<{input}>", command)
+					print(f"Bound {command} to '{input}'")
+					binds_str += f"{input}|{command.__name__}\n"
+				except Exception:
+					failed.append(command)
+					binds_str += f"{defaults[index]}|{command.__name__}\n"
+
+			binds_str = binds_str.strip()
+
+			if failed != []:
+				messagebox.showerror("Failed Setting Bind For Command(s)", f"Failed to set binds for {[command.__name__ for command in failed]}", parent=settings_root)
+			else:
+				messagebox.showinfo("Keybind Setting Success", "Successfully set binds for functions.", parent=settings_root)
+
+			WriteTo(f"{self_name}Binds.txt", binds_str)
+			return 0			
 
 		def Exit() -> None:
 			settings_root.destroy()
@@ -1119,17 +1139,19 @@ def OpenSettings(page:int=0, update:bool=False, _from=root) -> None:
 		settings_root.bind("esc", lambda e: Exit())
 
 		def SaveExit() -> None:
-			Set()
-			Exit()
+			return_code = Set()
+			if return_code != 1:
+				Exit()
 
 		syntax_label = tk.Label(settings_root, text="EXAMPLE: 'Control-Shift-b' (In Developement)", bg=self_theme.bg, fg=self_theme.fg)
 		syntax_label.grid(row=0, column=0,columnspan=6, padx=10, pady=5)
 
-		list_module_label = tk.Label(settings_root, text="Keybind To List All Modules In The Textbox", bg=self_theme.bg, fg=self_theme.fg)
+		list_module_label = tk.Label(settings_root, text="Keybind For ListModules()", bg=self_theme.bg, fg=self_theme.fg)
 		list_module_label.grid(row=1, column=0,columnspan=6, padx=10, pady=5)
 
 		list_modules_keybind = tk.Entry(settings_root)
 		list_modules_keybind.grid(row=2, column=0, columnspan=6, padx=10, pady=10)
+		list_modules_keybind.insert(0, binds[0])
 
 		checkbox_button = tk.Button(settings_root, text="<- Checkboxes (Page 0)", command=lambda: ChangePage(0), bg=self_theme.bg, fg=self_theme.fg)
 		checkbox_button.grid(row=4, column=2, padx=5, pady=5)
@@ -1177,7 +1199,10 @@ def OpenSettings(page:int=0, update:bool=False, _from=root) -> None:
 					time.sleep(.125)
 					continue	
 				update_id_status = False
-				settings_id_label.config(text=f"Settings ID: {BinaryIn("".join(str(int(val.get())) for val in setting_variables))}")
+				try:
+					settings_id_label.config(text=f"Settings ID: {BinaryIn("".join(str(int(val.get())) for val in setting_variables))}")
+				except Exception:
+					return
 				update_id_status = True
 				time.sleep(.125)
 
@@ -1369,7 +1394,7 @@ def Info() -> None:
 			Input(f"\n{g}: {GLOBALS[g]}")
 
 def CloseHub():
-	WriteTo(f"{self_name}Condition.txt", f"")
+	WriteTo(f"{self_name}Condition.txt", f"{absolute_filepath}\n{self_name}\n{self_directory}")
 	Log("HUB CLOSE", type="SYSTEM", time_log=True)
 	root.destroy()
 
@@ -1582,6 +1607,14 @@ backup_button.grid(row=5, column=0, padx=5)
 refresh_button = tk.Button(root, text="Refresh", command=Refresh, width=20, bg=self_theme.bg, fg=self_theme.fg)
 refresh_button.grid(row=6, column=0, columnspan=2, padx=5)
 
+"""
+
+INITIALIZATION PART 2
+
+"""
+
+print("Initialization Frontend|")
+
 root.bind("<Control-m>", lambda event: ListModules())
 root.bind("<Control-i>", lambda event: Info())
 root.bind("<Control-b>", lambda event: ShowBinds())
@@ -1591,6 +1624,30 @@ root.bind("<Control-d>", lambda event: ListDropdown())
 root.bind("<Control-w>", lambda event: WebSearch())
 root.bind("<Control-e>", lambda event: SystemRun())
 
+binds_file = ContentOfFile(f"{self_name}Binds.txt", "List")
+
+binds = []
+bind_funcs = []
+
+for entry in binds_file:
+	bind = entry[:-len(entry) + entry.find("|")]
+	try:
+		func = globals()[entry[entry.find("|") + 1:]]
+	except Exception:
+		func = None
+	binds.append(bind)
+	bind_funcs.append(func)
+
+if not "File" in binds_file:
+	for index, bind in enumerate(binds):
+		try:
+			root.bind(f"<{bind}>", bind_funcs[index])
+			print(f"Success binding {bind_funcs[index].__name__} to '{bind}'")
+		except Exception:
+			print(f"Failure binding {bind_funcs[index].__name__} to '{bind}'")
+
+print(f"Binds: Set\n")
+
 root.protocol("WM_DELETE_WINDOW", lambda: CloseHub())
 
 keyboard.add_hotkey("ctrl+shift+h", lambda: TopWindow(root))
@@ -1599,6 +1656,6 @@ if open_file != None:
 	OnScriptSelection(opened_filename)
 
 TopWindow(root, hold=True)
-root.focus()
+print("Initialized")
 
 root.mainloop()
