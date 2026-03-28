@@ -435,7 +435,7 @@ def Filepath(filename: str|None=None) -> str|None:
 		return None
 	elif filename in scripts.keys():
 		return scripts[filename]
-	elif filename == None:
+	elif filename == None or filename == Filename(open_file):
 		return absolute_filepath
 	elif os.path.isfile(os.path.join(self_directory, filename)):
 		return filename
@@ -1685,7 +1685,7 @@ def SystemRun() -> None:
 	Log("SystemRun() Cancelled", type="SYSTEM")
 
 selected_script = tk.StringVar()
-selected_script.set("Select a script" if open_file == None else opened_filename)
+selected_script.set("Loading...")
 
 script_dropdown = tk.OptionMenu(root, selected_script, ["Self"], command=OnScriptSelection)
 script_dropdown.grid(row=0, column=0, columnspan=2, padx=10, pady=10)
@@ -1778,6 +1778,7 @@ Log(f"HUB STARTUP", type="SYSTEM", time_log=True)
 ApplySettings()
 UpdateScripts()
 ReloadDropdown(script_dropdown, scripts, "lambda: (selected_script.set(KEY), OnScriptSelection(None, file=scripts[KEY]))", True, "Select a script", selected_script)
+selected_script.set("Select a script" if open_file == None else Filename(open_file))
 CheckHandleRename()
 
 root.protocol("WM_DELETE_WINDOW", lambda: CloseHub())
