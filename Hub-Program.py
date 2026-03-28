@@ -480,11 +480,11 @@ def SeeCode(filename=None) -> None:
 			Update()
 			time.sleep(3)
 			textbox.config(state="normal")
-			Delete()
+			OnScriptSelection()
 		else:
 			Input(text)
 		function_setting = bool(setting_variables[1].get())
-		copy_to_clip = False if function_setting == True else messagebox.askyesno("Confirmation", "Copy To Clipboard?")
+		copy_to_clip = False if (denied or function_setting == True) else messagebox.askyesno("Confirmation", "Copy To Clipboard?")
 		if copy_to_clip:
 			pyperclip.copy(text)
 	else:
@@ -1002,7 +1002,7 @@ def DropdownManipulation() -> None:
 
 		PushScripts(new_scripts)
 		UpdateScripts()
-		ReloadDropdown()
+		ReloadDropdown(script_dropdown, new_scripts, "lambda: (selected_script.set(KEY), OnScriptSelection(None, file=scripts[KEY]))", True, "Select a script", selected_script)
 
 	def Remove():
 		Log("Remove()")
@@ -1013,7 +1013,7 @@ def DropdownManipulation() -> None:
 			inv_scripts = {v: k for k, v in scripts.items()}
 			PushScripts()
 			UpdateScripts()
-			ReloadDropdown()
+			ReloadDropdown(script_dropdown, scripts, "lambda: (selected_script.set(KEY), OnScriptSelection(None, file=scripts[KEY]))", True, "Select a script", selected_script)
 
 	selected = selected_script.get()
 	exists_in = selected in scripts.keys()
