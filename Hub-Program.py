@@ -435,7 +435,7 @@ def Filepath(filename: str|None=None) -> str|None:
 		return None
 	elif filename in scripts.keys():
 		return scripts[filename]
-	elif filename == None or filename == Filename(open_file):
+	elif filename == None or (open_file != None and filename == Filename(open_file)):
 		return absolute_filepath
 	elif os.path.isfile(os.path.join(self_directory, filename)):
 		return filename
