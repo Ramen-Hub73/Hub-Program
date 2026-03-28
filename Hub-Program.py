@@ -49,11 +49,12 @@ class Theme:
 self_theme = Theme()
 Length, Height = 70, 30
 command_history = []
-run = None
+running_processes = []
+running_names = []
 absolute_filepath = open_file
 self_directory = os.path.dirname(os.path.realpath(__file__))
 
-print(f"Opening: {open_file}\nFile: {self_file}\nPlatform: {platform}\nDirectory: {self_directory}\n")
+print(f"\tOpening: {open_file}\n\tFile: {self_file}\n\tPlatform: {platform}\n\tDirectory: {self_directory}\n")
 
 """
 
@@ -74,8 +75,32 @@ def ConfigWidget(widget=None, arg=None, value=None) -> None:
 		for w in widget:
 			exec(f"global {w}\n{w}.config({arg}={value})")
 
+def ReloadDropdown(dropdown=None, new_options:list=[""], new_command="", attempt_keep:bool=True, default:str="", variable=None) -> None:
+	if dropdown == None or variable == None:
+		return
+	try:
+		option_type = type(new_options)
+		old_selected = variable.get()
+		menu = dropdown["menu"] # Gemini help (4 Lines)
+		menu.delete(0, "end")
+		if option_type == list:
+			for option in new_options:
+				new_command = new_command.replace("INDEX", f"'{option}'")
+				exec(f"menu.add_command(label=option, command={new_command})")
+		elif option_type == dict:
+			for key, value in new_options.items():
+				exec(f"menu.add_command(label=key, command={new_command.replace("KEY", f"'{key}'").replace("VALUE", f"{value}")})")
+		names = new_options if option_type == list else new_options.keys()
+		if not attempt_keep or not variable.get() in names:
+			variable.set(default)
+		Log("ReloadDropdown()")
+		
+	except Exception as e:
+		pass
+
 def Log(entry:str="DefaultLogEntry", type:str="ACCESS", time_log=False) -> None:
-	if not bool(setting_variables[6].get()):
+	#Show(f"Logging({entry}, {type}, {time_log})")
+	if bool(setting_variables[6].get()) and type != "SYSTEM":
 		return
 
 	log_file = f"{self_name}Logs.txt"
@@ -155,6 +180,7 @@ def Delete(start=1, lines="All"):
 def Show(text) -> None:
 	Delete()
 	Input(text)
+	Update()
 
 def Slowprint(text, plus=False, chars_to_skip="", delay=.05, preset=None):
 	if plus:
@@ -346,6 +372,15 @@ def FormatSize(bytes: int=0):
 	f_bytes = int(bytes) if int(bytes) == bytes else f"{bytes:.2f}"
 	return f"{f_bytes} PB"
 
+def LogIndex(index:int=-1) -> str:
+	logs = ContentOfFile(f"{self_name}Logs.txt", "List")
+	line_at_index = logs[index]
+	if line_at_index.startswith(" "):
+		return logs[index - 1] + line_at_index
+	elif "SYSTEM" in line_at_index:
+		return line_at_index + logs[index + 1]
+	return line_at_index
+
 """
 
 INITIALIZATION PART 1
@@ -376,7 +411,7 @@ for var in setting_variables:
 root.iconbitmap(default="Hub_Default_Icon.ico")
 root.iconbitmap("Hub_Icon.ico")
 
-print(f"Theme: Set\nSettings: Set\n")
+print(f"\tTheme: Set\n\tSettings: Set\n")
 
 
 """
@@ -412,6 +447,20 @@ def Filename(path:str=None) -> None:
 	if not "/" in path:
 		return path
 	return path[len(path) - path[::-1].find("/"):]
+
+def FoldersInPath(path:str=None) -> list:
+	if path == None:
+		return []
+	folders = []
+	path = path.replace("\\", "/")
+	while True:
+		if "/" in path:
+			index = path.find("/")
+			folders.append(path[:-len(path) + index])
+			path = path[index + 1:]
+		else:
+			break
+	return folders
 	
 def SeeCode(filename=None) -> None:
 	Log(f"SeeCode(filename={filename})")
@@ -421,7 +470,7 @@ def SeeCode(filename=None) -> None:
 	
 	if filepath != None:
 		text = ContentOfFile(filepath)
-		Input(Centered(f"Content Of {filename}", "=", end=True, end_line=1))
+		Input(Centered(f"Content Of {filename}", "_", end=True, end_line=1))
 		denied = False
 		if text == "Unable To Read File":
 			denied = True
@@ -453,48 +502,99 @@ def RunScript(filename=None) -> None:
 		messagebox.showerror("File Not Found", f"The file {filename} was not found.", parent=root)
 		return
 
-	CloseScript()
-
 	def ScriptThread() -> None:
-		global run
+		global running_processes, running_names
 
-		keyboard.add_hotkey("esc", CloseScript)
-
+		self_run_index = len(running_processes)
 		ConfigWidget("close_button", "state", "tk.NORMAL")
-
 		function_setting = bool(setting_variables[8].get())
 		if function_setting:
 			root.iconify()
 
-		run = subprocess.Popen(filepath, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
-	
-		result, error = run.communicate()
+		running_processes.append(subprocess.Popen(filepath, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True))
+		running_names.append(Filename(filepath))
+		result, error = running_processes[self_run_index].communicate()
 		result, error = result if result != "" else "Nothing...", error if error != "" else "Nothing..."
 
-		keyboard.remove_hotkey("esc")
+		running_processes[self_run_index] = None
 
-		Delete()
-		Input(Centered(f"Output from {filename}", "=", end=True, end_line=3))
-		Input(f"{result}\n\n\n{Centered(f"Error(s) from {filename}", "=", end=True)}\n\n\n{error}\n\n\n")
-		root.attributes('-topmost', True)
-		root.update_idletasks()
-		root.attributes('-topmost', False)
+		try:
+			Show(Centered(f"Output from {filename}", "_", end=True, end_line=3) + f"{result}\n\n\n{Centered(f"Error(s) from {filename}", "_", end=True)}\n\n\n{error}\n\n\n")
+			TopWindow(root)
 		
-		run = None
-
-		ConfigWidget("close_button", "state", "tk.DISABLED")
-		TopWindow(root, hold=True)
+			#Cleaner that will have better implementation later
+			running_count = len(running_processes)
+			dead_count = 0
+			for run in running_processes:
+				if run == None:
+					dead_count += 1
+		
+			all_dead = False
+			if running_count == dead_count:
+				all_dead = True
+				#running_processes = []
+				#running_names = []
+			
+			if all_dead:
+				ConfigWidget("close_button", "state", "tk.DISABLED")
+			TopWindow(root, hold=True)
+		except Exception:
+			pass
 
 	run_thread = threading.Thread(target=ScriptThread)
 	run_thread.start()
 
-def CloseScript() -> None:
-	Log("CloseScript()")
-	global run
-	if run != None:
-		subprocess.Popen("TASKKILL /F /PID {pid} /T".format(pid=run.pid))
+def CloseRunning(index:int=None) -> None:
+	global running_processes
+	index = index if index != None else len(running_processes) - 1
+	if index == -1:
+		return
+	Log(f"CloseRunning(index={index})")
+	try:
+		Show(f"Attempting To Close Process {running_names[index]}")
+		subprocess.Popen("TASKKILL /F /PID {pid} /T".format(pid=running_processes[index].pid))
 		ConfigWidget("close_button", "state", "tk.DISABLED")
-		run = None
+		running_processes[index] = None
+	except Exception as e:
+		print(str(e))
+
+def CloseRunningChoose() -> None:
+	close_root = Toplevel(root)
+	close_root.withdraw()
+	close_root.title("Process Closing Selection")
+	close_root.resizable(False, False)
+	close_root.config(bg=self_theme.bg)
+
+	process_select_variables = [tk.IntVar() for i in range(len(running_processes))]
+
+	for index, process_name in enumerate(running_names):
+		if running_processes[index] == None:
+			continue
+		process_checkbox = tk.Checkbutton(close_root, text=f"Kill Process {process_name}", variable=process_select_variables[index], bg=self_theme.bg, fg=self_theme.fg, selectcolor=self_theme.bg)
+		process_checkbox.grid(row=index, column=1, padx=10, pady=10)
+		end_row = index
+
+	def Finalize() -> None:
+		for index, selected_state in enumerate(process_select_variables):
+			if selected_state.get() == 1:
+				CloseRunning(index)
+		close_root.destroy()
+		TopWindow(root, hold=True)
+
+	close_root.protocol("WM_DELETE_WINDOW", lambda: (close_root.destroy(), TopWindow(root)))
+	close_root.bind("esc", root.destroy)
+	
+	finalize_button = tk.Button(close_root, text="Kill Process(es)", command=Finalize, bg=self_theme.bg, fg=self_theme.fg)
+	finalize_button.grid(row=end_row + 1, column=1, padx=10, pady=10)
+
+	root.iconify()
+	TopWindow(close_root, hold=True)
+
+def CloseAllRunning() -> None:
+	Log("CloseAllRunning()")
+	for index, run in enumerate(running_processes):
+		if run != None:
+			CloseRunning(index)
 
 def DriveSelect() -> None:
 	Log("DriveSelect()")
@@ -520,7 +620,7 @@ def ListScripts() -> None:
 	else:
 		files = os.listdir(directory)
 	
-	string = Centered(f"Files in {directory}", char="=", end=True, newline=1) if len(files) > 0 else Centered(f"No files detected in {directory}", end=True, newline=2)
+	string = Centered(f"Files in {directory}", char="_", end=True, newline=1) if len(files) > 0 else Centered(f"No files detected in {directory}", end=True, newline=2)
 	i = 0
 	for index, file in enumerate(files):
 		if files == []:
@@ -533,6 +633,52 @@ def ListScripts() -> None:
 			string += Centered(file, cuts=3, end=True)
 	Show(string)
 
+def PushScripts(scripts_input:dict=None) -> None:
+	Log("PushScripts", type="SYSTEM")
+	scripts_str = f"{scripts}"
+	if scripts_input != None:
+		scripts_str = f"{scripts_input}"
+	WriteTo(f"{self_name}Scripts.txt", f"scripts = {scripts_str}")
+
+def HandleRename(old:str=None, new:str=None) -> None:
+	Log("HandleRename()")
+	global scripts
+	if old == None or new == None:
+		return
+	handled = []
+	for path in scripts.values():
+		path = path.replace(old, new)
+		handled.append(path)
+	for index, name in enumerate(scripts.keys()):
+		scripts[name] = handled[index]
+
+def CheckHandleRename() -> None:
+	Log("CheckHandleRename()")
+	invalid = []
+
+	for path in scripts.values():
+		if not os.path.exists(path):
+			invalid.append(path)
+
+	for path in invalid:
+		if not path in scripts.values():
+			continue
+		old = simpledialog.askstring("Invalid Path Rename Prompt", f"Path {path} couldn't be found.\nIf a folder was renamed in this path, please enter it here.\n'Cancel' to skip.", parent=root)
+		if old == None or old == "":
+			continue
+		new = simpledialog.askstring("New Path Part Prompt", "What would you like to replace it with?", parent=root)
+		HandleRename(old, new)
+
+	if invalid != []:
+		try:
+			for path in scripts.values():
+				if not os.path.exists(path):
+					x = 1 / 0
+			messagebox.showinfo("Scripts Secured", "New script paths exist, now running PushScripts().", parent=root)
+			PushScripts()
+		except Exception:
+			messagebox.showerror("Script Error", "Error still persists.", parent=root)
+
 def EditScript(filename=None) -> None:
 	Log(f"EditScript(filename={filename})")
 	global func_drop_change
@@ -540,6 +686,7 @@ def EditScript(filename=None) -> None:
 	filepath = Filepath(filename)
 	
 	if not filepath == None and os.path.exists(filepath):
+		global FindLine, selected_func
 		function_setting = bool(setting_variables[4].get())
 		if function_setting:
 			root.iconify()
@@ -554,7 +701,7 @@ def EditScript(filename=None) -> None:
 		if filepath == self_file or filepath == self_directory + self_file:
 			editing_self = True
 
-		updating = True
+		updating_edit = True
 		keyboard.remove_hotkey("ctrl+shift+h")
 		keyboard.add_hotkey("ctrl+shift+h", lambda: TopWindow(edit_root))
 
@@ -566,6 +713,8 @@ def EditScript(filename=None) -> None:
 			denied = True
 
 		def Exit() -> None:
+			global updating_edit
+			updating_edit = False
 			function_setting = bool(setting_variables[7].get())
 			exiting_content = ContentOfFile(filepath).strip()
 			content = text_widget.get("1.0", tk.END).strip()
@@ -585,7 +734,7 @@ def EditScript(filename=None) -> None:
 			if os.path.exists(filepath):
 				OnScriptSelection()			
 
-			if file_difference and function_setting and editing_self:
+			if file_difference and function_setting and editing_self and confirmation:
 				Refresh()
 
 		edit_root.protocol("WM_DELETE_WINDOW", lambda: Exit())
@@ -602,42 +751,41 @@ def EditScript(filename=None) -> None:
 
 		if denied:
 			text_widget.config(state="disabled")
-			updating = False
+			updating_edit = False
 
 		selected_func = tk.StringVar()
 		selected_func.set("Function Lookup")
 
-		func_list, func_indexes, class_list, class_indexes = [], [], [], []
-		if not denied:
-			func_list, func_indexes, class_list, class_indexes = FunctionsOf(filepath, indexes=True, class_inclusion=True, order_preset=["class", "function"], indent_desc=True)
+		def UpdateFuncDropdown() -> None:
+			global func_list, class_list, functions, indexes
+			WriteTo(f"{self_name}_tempeditfile", text_widget.get("1.0", tk.END))
+			func_list, func_indexes, class_list, class_indexes = [], [], [], []
+			if not denied:
+				func_list, func_indexes, class_list, class_indexes = FunctionsOf(f"{self_name}_tempeditfile", indexes=True, class_inclusion=True, order_preset=["class", "function"], indent_desc=True)
 
-		func_list = [f"FUNC {func_indexes[index] + 1}: {f}" for index, f in enumerate(func_list)]
-		class_list = [f"CLASS {class_indexes[index] + 1}: {c}" for index, c in enumerate(class_list)]
+			func_list = [f"FUNC {func_indexes[index] + 1}: {f}" for index, f in enumerate(func_list)]
+			class_list = [f"CLASS {class_indexes[index] + 1}: {c}" for index, c in enumerate(class_list)]
 
-		functions = class_list + func_list
-		indexes = class_indexes + func_indexes
+			functions = class_list + func_list
+			indexes = class_indexes + func_indexes
 
-		if functions == []:
-			functions = [""]
-			indexes = [None]
-			selected_func.set("No Func/Class Detected")
-
-		func_drop_change = False
-
-		def PulseFuncDrop(value):
-			global func_drop_change
-			if denied:
+			if functions == []:
+				functions = [""]
+				indexes = [None]
 				selected_func.set("No Func/Class Detected")
-			func_drop_change = True
+			functions = dict(zip(functions, indexes))
+			ReloadDropdown(func_dropdown, functions, "lambda: (selected_func.set(KEY), FindLine(VALUE + 1))", variable=selected_func, attempt_keep=True, default="Function Lookup")
 
-		func_dropdown = tk.OptionMenu(edit_root, selected_func, *functions, command=PulseFuncDrop)
+		func_dropdown = tk.OptionMenu(edit_root, variable=selected_func, value="Func Dropdown")
 		func_dropdown.grid(row=1, column=2, columnspan=2, pady=10)
 
 		func_dropdown.configure(background=self_theme.bg, foreground=self_theme.fg)
 		func_dropdown["menu"].configure(bg=self_theme.bg, fg=self_theme.fg)
-			
+
+		UpdateFuncDropdown()
+
 		def FindLine(index:int=None) -> None:
-			line_index = index
+			line_index = index if index == None else int(index)
 			if line_index == None:
 				line_index = simpledialog.askstring("Line Index Input", "What line would you like to go to?", parent=edit_root)
 			if type(line_index) == int or line_index.isdigit():
@@ -726,24 +874,7 @@ def EditScript(filename=None) -> None:
 
 		def UpdateIndex() -> None:
 			global func_drop_change
-			while updating:
-				if func_drop_change:
-					selected = selected_func.get()
-					try:
-						index = indexes[functions.index(selected)]
-					except Exception:
-						index = None
-					if index != None:
-						try:
-							text_widget.yview(index - 11)
-							text_widget.update()
-							text_widget.mark_set("insert", f"{index + 1}.0")
-							text_widget.focus()
-						except Exception as e:
-							print("(EditScript) UpdateIndex() Unexpected Failure.\n{str(e)}")
-					else:
-						selected_func.set("No Func/Class Detected")
-					func_drop_change = False
+			while updating_edit:
 				try:
 					position = text_widget.index(tk.INSERT)
 					seperator_index = position.index(".")
@@ -822,6 +953,7 @@ def EditScript(filename=None) -> None:
 		edit_root.bind("<Control-d>", lambda e: DeleteScript())
 		edit_root.bind("<Control-r>", lambda e: RestoreScript())
 		edit_root.bind("<Control-Shift-i>", lambda e: Info())
+		edit_root.bind("<Control-u>", lambda e: UpdateFuncDropdown())
 
 		exit_button = tk.Button(edit_root, text="Exit", command=Exit, width=20, bg=self_theme.bg, fg=self_theme.fg)
 		exit_button.grid(row=5, column=3, columnspan=1, pady=5)
@@ -840,6 +972,7 @@ def EditScript(filename=None) -> None:
 def Refresh() -> None:
 	Log("REFRESH", type="SYSTEM")
 	WriteTo(f"{self_name}Condition.txt", f"{absolute_filepath}\n{self_name}\n{self_directory}")
+	CloseAllRunning()
 	python = sys.executable
 	os.execl(python, python, self_file)
 
@@ -867,7 +1000,7 @@ def DropdownManipulation() -> None:
 		for name, path in scripts.items():
 			new_scripts[name] = path
 
-		WriteTo(f"{self_name}Scripts.txt", f"scripts = {new_scripts}")
+		PushScripts(new_scripts)
 		UpdateScripts()
 		ReloadDropdown()
 
@@ -878,7 +1011,7 @@ def DropdownManipulation() -> None:
 		if selected != "Select a script":
 			scripts.pop(selected)
 			inv_scripts = {v: k for k, v in scripts.items()}
-			WriteTo(f"{self_name}Scripts.txt", f"scripts = {scripts}")
+			PushScripts()
 			UpdateScripts()
 			ReloadDropdown()
 
@@ -1041,6 +1174,21 @@ def OpenSettings(page:int=0, update:bool=False, _from=root) -> None:
 			confirmation = messagebox.askyesno("Theme Confirmation", f"Confirm New Theme?", parent=settings_root)
 			if not confirmation:
 				return
+
+			WriteTo(f"{self_name}Theme.txt", f"{bg_entry.get()}\n{fg_entry.get()}\n{tbbg_entry.get()}\n{tbfg_entry.get()}\n{insertion_entry.get()}")
+			Refresh()
+
+		def SavePreset() -> None:
+			bg = bg_entry.get()
+			fg = fg_entry.get()
+			tb_bg = tbbg_entry.get()
+			tb_fg = tbfg_entry.get()
+			insert = insertion_entry.get()
+
+			confirmation = messagebox.askyesno("Save Preset Confirmation", f"Save Preset? You can only have one at a time.", parent=settings_root)
+			if not confirmation:
+				return
+			return
 
 			WriteTo(f"{self_name}Theme.txt", f"{bg_entry.get()}\n{fg_entry.get()}\n{tbbg_entry.get()}\n{tbfg_entry.get()}\n{insertion_entry.get()}")
 			Refresh()
@@ -1234,7 +1382,7 @@ def OpenSettings(page:int=0, update:bool=False, _from=root) -> None:
 		edit_iconify_checkbox = tk.Checkbutton(settings_root, text="Iconify Root When Editing Script", variable=setting_variables[4], command=SignalUpdate, bg=self_theme.bg, fg=self_theme.fg, selectcolor=self_theme.bg)
 		edit_iconify_checkbox.grid(row=4, column=0, columnspan=6, padx=10, pady=10)
 
-		log_checkbox = tk.Checkbutton(settings_root, text="Hub Logs", variable=setting_variables[5], command=SignalUpdate, bg=self_theme.bg, fg=self_theme.fg, selectcolor=self_theme.bg)
+		log_checkbox = tk.Checkbutton(settings_root, text="Only Log Of 'SYSTEM' Type", variable=setting_variables[5], command=SignalUpdate, bg=self_theme.bg, fg=self_theme.fg, selectcolor=self_theme.bg)
 		log_checkbox.grid(row=5, column=0, columnspan=6, padx=10, pady=10)
 
 		file_info_checkbox = tk.Checkbutton(settings_root, text="Show File Info On Select", variable=setting_variables[6], command=SignalUpdate, bg=self_theme.bg, fg=self_theme.fg, selectcolor=self_theme.bg)
@@ -1322,7 +1470,7 @@ def OnScriptSelection(event=None, file=None, *args) -> None:
 		return
 	ConfigWidget(["run_button", "edit_button", "see_code_button", "dropdown_button"], "state", "tk.NORMAL")
 	if function_setting:
-		Input(Centered(f"File Info", "=", end=True, end_line=2))
+		Input(Centered(f"File Info", "_", end=True, end_line=2))
 		mod_time_timestamp = os.path.getmtime(filepath) #Gemini Help (2 Lines) 
 		mod_datetime = f"{datetime.fromtimestamp(mod_time_timestamp)}"
 		mod_datetime = mod_datetime[:-len(mod_datetime) + mod_datetime.find('.')]
@@ -1394,28 +1542,12 @@ def Info() -> None:
 			Input(f"\n{g}: {GLOBALS[g]}")
 
 def CloseHub():
+	Show("Writing Condition File...")
 	WriteTo(f"{self_name}Condition.txt", f"{absolute_filepath}\n{self_name}\n{self_directory}")
 	Log("HUB CLOSE", type="SYSTEM", time_log=True)
-	root.destroy()
-
-def ReloadDropdown() -> None:
-	global script_dropdown, selected_scripts
-	try:
-		old_selected = selected_script.get()
-		menu = script_dropdown["menu"] # Gemini help (4 Lines)
-		menu.delete(0, "end")
-		for name, path in scripts.items():
-			menu.add_command(label=name, command=lambda *args, v=name: (selected_script.set(v), OnScriptSelection(None, file=scripts[v])))
-		if old_selected in scripts.keys():
-			selected_script.set(old_selected)
-		else:
-			selected_script.set("Select a script")
-			ConfigWidget(["run_button", "edit_button", "see_code_button", "dropdown_button"], "state", "tk.DISABLED")
-
-		Log("ReloadDropdown()")
-		
-	except Exception:
-		return
+	Show("Searching/Closing Sub-processes...")
+	CloseAllRunning()
+	sys.exit()
 
 def UpdateScripts() -> None:
 	Log("UpdateScripts()")
@@ -1552,17 +1684,10 @@ def SystemRun() -> None:
 
 	Log("SystemRun() Cancelled", type="SYSTEM")
 
-Log(f"HUB STARTUP", type="SYSTEM", time_log=True)
-ApplySettings()
-UpdateScripts()
-
-if open_file != None:
-	opened_filename = Filename(open_file) if not open_file in list(scripts.values()) else list(scripts.keys())[list(scripts.values()).index(open_file)]
-
 selected_script = tk.StringVar()
 selected_script.set("Select a script" if open_file == None else opened_filename)
 
-script_dropdown = tk.OptionMenu(root, selected_script, *scripts.keys(), command=OnScriptSelection)
+script_dropdown = tk.OptionMenu(root, selected_script, ["Self"], command=OnScriptSelection)
 script_dropdown.grid(row=0, column=0, columnspan=2, padx=10, pady=10)
 
 script_dropdown.configure(background=self_theme.bg, foreground=self_theme.fg)
@@ -1595,10 +1720,10 @@ dropdown_button.grid(row=5, column=0, columnspan=2, padx=5)
 edit_button = tk.Button(root, text="Edit File", command=EditScript, width=20, state=tk.DISABLED, bg=self_theme.bg, fg=self_theme.fg)
 edit_button.grid(row=5, column=1, padx=5)
 
-close_button = tk.Button(root, text="Close Running", command=CloseScript, width=20, state=tk.DISABLED, bg=self_theme.bg, fg=self_theme.fg)
+close_button = tk.Button(root, text="Choose Process Closing", command=CloseRunningChoose, width=20, state=tk.DISABLED, bg=self_theme.bg, fg=self_theme.fg)
 close_button.grid(row=4, column=1, padx=5)
 
-install_button = tk.Button(root, text="Install Module", command=ModuleManipulation, width=20, bg=self_theme.bg, fg=self_theme.fg)
+install_button = tk.Button(root, text="Install/Delete Module", command=ModuleManipulation, width=20, bg=self_theme.bg, fg=self_theme.fg)
 install_button.grid(row=4, column=0, padx=5)
 
 backup_button = tk.Button(root, text="Backup Hub", command=Backup, width=20, bg=self_theme.bg, fg=self_theme.fg)
@@ -1623,6 +1748,7 @@ root.bind("<Control-l>", lambda event: ListScripts())
 root.bind("<Control-d>", lambda event: ListDropdown())
 root.bind("<Control-w>", lambda event: WebSearch())
 root.bind("<Control-e>", lambda event: SystemRun())
+root.bind("esc", lambda event: CloseAllRunning())
 
 binds_file = ContentOfFile(f"{self_name}Binds.txt", "List")
 
@@ -1642,17 +1768,24 @@ if not "File" in binds_file:
 	for index, bind in enumerate(binds):
 		try:
 			root.bind(f"<{bind}>", bind_funcs[index])
-			print(f"Success binding {bind_funcs[index].__name__} to '{bind}'")
+			print(f"\tSuccess binding {bind_funcs[index].__name__} to '{bind}'")
 		except Exception:
-			print(f"Failure binding {bind_funcs[index].__name__} to '{bind}'")
+			print(f"\tFailure binding {bind_funcs[index].__name__} to '{bind}'")
 
-print(f"Binds: Set\n")
+print(f"\tBinds: Set\n")
+
+Log(f"HUB STARTUP", type="SYSTEM", time_log=True)
+ApplySettings()
+UpdateScripts()
+ReloadDropdown(script_dropdown, scripts, "lambda: (selected_script.set(KEY), OnScriptSelection(None, file=scripts[KEY]))", True, "Select a script", selected_script)
+CheckHandleRename()
 
 root.protocol("WM_DELETE_WINDOW", lambda: CloseHub())
 
 keyboard.add_hotkey("ctrl+shift+h", lambda: TopWindow(root))
 
 if open_file != None:
+	opened_filename = Filename(open_file) if not open_file in list(scripts.values()) else list(scripts.keys())[list(scripts.values()).index(open_file)]
 	OnScriptSelection(opened_filename)
 
 TopWindow(root, hold=True)
