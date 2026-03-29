@@ -638,7 +638,7 @@ def PushScripts(scripts_input:dict=None) -> None:
 	scripts_str = f"{scripts}"
 	if scripts_input != None:
 		scripts_str = f"{scripts_input}"
-	WriteTo(f"{self_name}Scripts.txt", f"scripts = {scripts_str}")
+	WriteTo(f"{self_directory}/{self_name}Scripts.txt", f"scripts = {scripts_str}")
 
 def HandleRename(old:str=None, new:str=None) -> None:
 	Log("HandleRename()")
@@ -758,7 +758,7 @@ def EditScript(filename=None) -> None:
 
 		def UpdateFuncDropdown() -> None:
 			global func_list, class_list, functions, indexes
-			WriteTo(f"{self_name}_tempeditfile", text_widget.get("1.0", tk.END))
+			WriteTo(f"{self_directory}/{self_name}_tempeditfile", text_widget.get("1.0", tk.END))
 			func_list, func_indexes, class_list, class_indexes = [], [], [], []
 			if not denied:
 				func_list, func_indexes, class_list, class_indexes = FunctionsOf(f"{self_name}_tempeditfile", indexes=True, class_inclusion=True, order_preset=["class", "function"], indent_desc=True)
@@ -811,7 +811,7 @@ def EditScript(filename=None) -> None:
 
 			indexes = []
 			#Optimization needed
-			WriteTo(f"{self_name}_tempeditfile", text_widget.get("1.0", tk.END))
+			WriteTo(f"{self_directory}/{self_name}_tempeditfile", text_widget.get("1.0", tk.END))
 			content = ContentOfFile(f"{self_name}_tempeditfile", "List")
 
 			for index, line in enumerate(content):
@@ -971,7 +971,7 @@ def EditScript(filename=None) -> None:
 
 def Refresh() -> None:
 	Log("REFRESH", type="SYSTEM")
-	WriteTo(f"{self_name}Condition.txt", f"{absolute_filepath}\n{self_name}\n{self_directory}")
+	WriteTo(f"{self_directory}/{self_name}Condition.txt", f"{absolute_filepath}\n{self_name}\n{self_directory}")
 	CloseAllRunning()
 	python = sys.executable
 	os.execl(python, python, self_file)
@@ -1175,7 +1175,7 @@ def OpenSettings(page:int=0, update:bool=False, _from=root) -> None:
 			if not confirmation:
 				return
 
-			WriteTo(f"{self_name}Theme.txt", f"{bg_entry.get()}\n{fg_entry.get()}\n{tbbg_entry.get()}\n{tbfg_entry.get()}\n{insertion_entry.get()}")
+			WriteTo(f"{self_directory}/{self_name}Theme.txt", f"{bg_entry.get()}\n{fg_entry.get()}\n{tbbg_entry.get()}\n{tbfg_entry.get()}\n{insertion_entry.get()}")
 			Refresh()
 
 		def SavePreset() -> None:
@@ -1190,7 +1190,7 @@ def OpenSettings(page:int=0, update:bool=False, _from=root) -> None:
 				return
 			return
 
-			WriteTo(f"{self_name}Theme.txt", f"{bg_entry.get()}\n{fg_entry.get()}\n{tbbg_entry.get()}\n{tbfg_entry.get()}\n{insertion_entry.get()}")
+			WriteTo(f"{self_directory}/{self_name}Theme.txt", f"{bg_entry.get()}\n{fg_entry.get()}\n{tbbg_entry.get()}\n{tbfg_entry.get()}\n{insertion_entry.get()}")
 			Refresh()
 
 		label = tk.Label(settings_root, text=f"(SAVING WILL REFRESH THE HUB)", bg=self_theme.bg, fg=self_theme.fg)
@@ -1276,7 +1276,7 @@ def OpenSettings(page:int=0, update:bool=False, _from=root) -> None:
 			else:
 				messagebox.showinfo("Keybind Setting Success", "Successfully set binds for functions.", parent=settings_root)
 
-			WriteTo(f"{self_name}Binds.txt", binds_str)
+			WriteTo(f"{self_directory}/{self_name}Binds.txt", binds_str)
 			return 0			
 
 		def Exit() -> None:
@@ -1317,7 +1317,7 @@ def OpenSettings(page:int=0, update:bool=False, _from=root) -> None:
 	def ReframeToCheckboxes() -> None:
 		def Set() -> None:
 			log_string = "".join([str(int(val.get())) for val in setting_variables])
-			WriteTo(f"{self_name}Settings.txt", log_string)
+			WriteTo(f"{self_directory}/{self_name}Settings.txt", log_string)
 			ApplySettings()
 	
 		def Exit() -> None:
@@ -1543,7 +1543,7 @@ def Info() -> None:
 
 def CloseHub():
 	Show("Writing Condition File...")
-	WriteTo(f"{self_name}Condition.txt", f"{absolute_filepath}\n{self_name}\n{self_directory}")
+	WriteTo(f"{self_directory}/{self_name}Condition.txt", f"{absolute_filepath}\n{self_name}\n{self_directory}")
 	Log("HUB CLOSE", type="SYSTEM", time_log=True)
 	Show("Searching/Closing Sub-processes...")
 	CloseAllRunning()
