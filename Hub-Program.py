@@ -100,7 +100,7 @@ def ReloadDropdown(dropdown=None, new_options:list=[""], new_command="", attempt
 
 def Log(entry:str="DefaultLogEntry", type:str="ACCESS", time_log=False) -> None:
 	#Show(f"Logging({entry}, {type}, {time_log})")
-	if bool(setting_variables[6].get()) and type != "SYSTEM":
+	if bool(setting_variables[5].get()) and type != "SYSTEM":
 		return
 
 	log_file = f"{self_name}Logs.txt"
