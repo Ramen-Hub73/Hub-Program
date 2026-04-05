@@ -51,6 +51,7 @@ Length, Height = 70, 30
 command_history = []
 running_processes = []
 running_names = []
+killed_index = None
 absolute_filepath = open_file
 self_directory = os.path.dirname(os.path.realpath(__file__))
 
@@ -81,7 +82,7 @@ def ReloadDropdown(dropdown=None, new_options:list=[""], new_command="", attempt
 	try:
 		option_type = type(new_options)
 		old_selected = variable.get()
-		menu = dropdown["menu"] # Gemini help (4 Lines)
+		menu = dropdown["menu"] # Gemini help (1 Line)
 		menu.delete(0, "end")
 		if option_type == list:
 			for option in new_options:
@@ -505,23 +506,34 @@ def RunScript(filename=None) -> None:
 	def ScriptThread() -> None:
 		global running_processes, running_names
 
-		self_run_index = len(running_processes)
-		ConfigWidget("close_button", "state", "tk.NORMAL")
+		self_run_index = None
+		self_run_name = Filename(filepath)
 		function_setting = bool(setting_variables[8].get())
+		second_function_setting = setting_variables[9].get()
 		if function_setting:
 			root.iconify()
 
-		running_processes.append(subprocess.Popen(filepath, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True))
-		running_names.append(Filename(filepath))
-		result, error = running_processes[self_run_index].communicate()
-		result, error = result if result != "" else "Nothing...", error if error != "" else "Nothing..."
+		if second_function_setting:
+			subprocess.Popen(filepath, shell=True)
+		else:
+			self_run_index = len(running_processes)
+			ConfigWidget("close_button", "state", "tk.NORMAL")
+			running_names.append(self_run_name)
+			running_processes.append(subprocess.Popen(filepath, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True))
+			result, error = running_processes[self_run_index].communicate()
+			result, error = result if result != "" else "Nothing...", error if error != "" else "Nothing..."
+			self_killed = False
+			death_state = running_processes[self_run_index]
+			if death_state != "Free" and death_state != "Denied":
+				if killed_index == self_run_index:
+					self_killed = True
+					running_processes[self_run_index] = "Killed"
+				else:
+					running_processes[self_run_index] = "Finished"
 
-		running_processes[self_run_index] = None
+			print(f"\nSCRIPTTHREAD - ({self_run_name})\nFor Run of index {self_run_index}\nProcess Signature: {running_processes[self_run_index]}\n")
 
-		try:
-			Show(Centered(f"Output from {filename}", "_", end=True, end_line=3) + f"{result}\n\n\n{Centered(f"Error(s) from {filename}", "_", end=True)}\n\n\n{error}\n\n\n")
-			TopWindow(root)
-		
+		try:		
 			#Cleaner that will have better implementation later
 			running_count = len(running_processes)
 			dead_count = 0
@@ -530,13 +542,16 @@ def RunScript(filename=None) -> None:
 					dead_count += 1
 		
 			all_dead = False
-			if running_count == dead_count:
+			if running_count <= dead_count + 1:
 				all_dead = True
 				#running_processes = []
 				#running_names = []
 			
 			if all_dead:
-				ConfigWidget("close_button", "state", "tk.DISABLED")
+				...
+
+			if not self_killed and death_state != "Free":
+				Show(Centered(f"Output from {filename}", "_", end=True, end_line=3) + f"{result}\n\n\n{Centered(f"Error(s) from {filename}", "_", end=True)}\n\n\n{error}\n\n\n")
 			TopWindow(root, hold=True)
 		except Exception:
 			pass
@@ -545,45 +560,75 @@ def RunScript(filename=None) -> None:
 	run_thread.start()
 
 def CloseRunning(index:int=None) -> None:
-	global running_processes
+	global running_processes, killed_index
 	index = index if index != None else len(running_processes) - 1
 	if index == -1:
 		return
 	Log(f"CloseRunning(index={index})")
 	try:
-		Show(f"Attempting To Close Process {running_names[index]}")
-		subprocess.Popen("TASKKILL /F /PID {pid} /T".format(pid=running_processes[index].pid))
-		ConfigWidget("close_button", "state", "tk.DISABLED")
-		running_processes[index] = None
+		Show(f"Attempting To Close Process {running_names[index]}\nRunning Index: {index}")
+		process = running_processes[index]
+		process_name = running_names[index]
+		if type(process) == str:
+			Show(f"Process {process_name} at index {index} is free or already closed.")
+			return
+		killed_index = index
+		print(f"CLOSERUNNING - ({process_name})\nSet killed index to {index}")
+		results = subprocess.Popen("TASKKILL /F /PID {pid} /T".format(pid=process.pid), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+		success = results.stdout.read()
+		errors = results.stderr.read()
+		if "not found" in errors.lower():
+			running_processes[index] = "Lost"
+		if "denied" in errors.lower():
+			running_processes[index] = "Denied"
+		print(f"Reviewed Signature: {running_processes[index]}")
+		Show(f"\nOutput:\n{success if success != '' else 'Nothing...'}\n\nError(s):\n{errors if errors != '' else 'Nothing...'}")
+		dead = 0
+		for process in running_processes:
+			if type(process) == str:
+				dead += 1
+
+		print(f"Dead/Total: {dead}/{len(running_processes)}\n")
+		if dead == len(running_processes):
+			print(f"CloseRunning Detected All Processes Dead.\n\n")
+			ConfigWidget("close_button", "state", "tk.DISABLED")
 	except Exception as e:
-		print(str(e))
+		Input(str(e))
 
 def CloseRunningChoose() -> None:
 	close_root = Toplevel(root)
-	close_root.withdraw()
 	close_root.title("Process Closing Selection")
 	close_root.resizable(False, False)
 	close_root.config(bg=self_theme.bg)
+	close_root.withdraw()
 
 	process_select_variables = [tk.IntVar() for i in range(len(running_processes))]
 
+	end_row = None
 	for index, process_name in enumerate(running_names):
-		if running_processes[index] == None:
+		process_type = type(running_processes[index])
+		if process_type == str or process_type == None:
 			continue
-		process_checkbox = tk.Checkbutton(close_root, text=f"Kill Process {process_name}", variable=process_select_variables[index], bg=self_theme.bg, fg=self_theme.fg, selectcolor=self_theme.bg)
+		process_checkbox = tk.Checkbutton(close_root, text=f"Kill Process {process_name} at Index {index}", variable=process_select_variables[index], bg=self_theme.bg, fg=self_theme.fg, selectcolor=self_theme.bg)
 		process_checkbox.grid(row=index, column=1, padx=10, pady=10)
 		end_row = index
 
 	def Finalize() -> None:
+		close_root.destroy()
+		TopWindow(root, hold=True)
 		for index, selected_state in enumerate(process_select_variables):
 			if selected_state.get() == 1:
 				CloseRunning(index)
-		close_root.destroy()
-		TopWindow(root, hold=True)
 
-	close_root.protocol("WM_DELETE_WINDOW", lambda: (close_root.destroy(), TopWindow(root)))
-	close_root.bind("esc", root.destroy)
-	
+	if end_row == None:
+		Show("Error on accounting of running_processes. None found, configuring button.")
+		ConfigWidget("close_button", "state", "tk.DISABLED")
+		close_root.destroy()
+		return
+
+	close_root.protocol("WM_DELETE_WINDOW", lambda: (close_root.destroy(), TopWindow(root, hold=True)))
+	close_root.bind("esc", lambda: (close_root.destroy(), TopWindow(root, hold=True)))
+
 	finalize_button = tk.Button(close_root, text="Kill Process(es)", command=Finalize, bg=self_theme.bg, fg=self_theme.fg)
 	finalize_button.grid(row=end_row + 1, column=1, padx=10, pady=10)
 
@@ -593,8 +638,54 @@ def CloseRunningChoose() -> None:
 def CloseAllRunning() -> None:
 	Log("CloseAllRunning()")
 	for index, run in enumerate(running_processes):
-		if run != None:
+		if type(run) != str and type(run) != None:
 			CloseRunning(index)
+
+def SetFree(index:int):
+	global running_processes
+	if index > len(running_processes) - 1:
+		return
+	running_processes[index] = "Free"
+
+def SetFreeChoose() -> None:
+	free_root = Toplevel(root)
+	free_root.title("Process Freeing Selection")
+	free_root.resizable(False, False)
+	free_root.config(bg=self_theme.bg)
+	free_root.withdraw()
+
+	process_select_variables = [tk.IntVar() for i in range(len(running_processes))]
+
+	end_row = None
+	for index, process_name in enumerate(running_names):
+		process_type = type(running_processes[index])
+		if process_type == str or process_type == None:
+			continue
+		process_checkbox = tk.Checkbutton(free_root, text=f"Free Process {process_name} at Index {index}", variable=process_select_variables[index], bg=self_theme.bg, fg=self_theme.fg, selectcolor=self_theme.bg)
+		process_checkbox.grid(row=index, column=1, padx=10, pady=10)
+		end_row = index
+
+	def Finalize() -> None:
+		free_root.destroy()
+		TopWindow(root, hold=True)
+		for index, selected_state in enumerate(process_select_variables):
+			if selected_state.get() == 1:
+				SetFree(index)
+
+	if end_row == None:
+		Show("Error on accounting of running_processes. None found, configuring button.")
+		ConfigWidget("close_button", "state", "tk.DISABLED")
+		free_root.destroy()
+		return
+
+	free_root.protocol("WM_DELETE_WINDOW", lambda: (free_root.destroy(), TopWindow(root, hold=True)))
+	free_root.bind("esc", lambda: (free_root.destroy(), TopWindow(root, hold=True)))
+
+	finalize_button = tk.Button(free_root, text="Free Process(es)", command=Finalize, bg=self_theme.bg, fg=self_theme.fg)
+	finalize_button.grid(row=end_row + 1, column=1, padx=10, pady=10)
+
+	root.iconify()
+	TopWindow(free_root, hold=True)
 
 def DriveSelect() -> None:
 	Log("DriveSelect()")
@@ -953,7 +1044,7 @@ def EditScript(filename=None) -> None:
 		edit_root.bind("<Control-d>", lambda e: DeleteScript())
 		edit_root.bind("<Control-r>", lambda e: RestoreScript())
 		edit_root.bind("<Control-Shift-i>", lambda e: Info())
-		edit_root.bind("<Control-u>", lambda e: UpdateFuncDropdown())
+		edit_root.bind("<Control-u>", lambda e: (UpdateFuncDropdown(), func_count_label.config(text=f"Func Count: {len(func_list)} | Class Count: {len(class_list)}")))
 
 		exit_button = tk.Button(edit_root, text="Exit", command=Exit, width=20, bg=self_theme.bg, fg=self_theme.fg)
 		exit_button.grid(row=5, column=3, columnspan=1, pady=5)
@@ -970,9 +1061,15 @@ def EditScript(filename=None) -> None:
 		messagebox.showerror("File Not Found", f"The file {filename} was not found.", parent=root)
 
 def Refresh() -> None:
+	Show("Writing Condition File...")
 	Log("REFRESH", type="SYSTEM")
 	WriteTo(f"{self_directory}/{self_name}Condition.txt", f"{absolute_filepath}\n{self_name}\n{self_directory}")
+	time.sleep(.5)
+	Show("Searching/Closing Sub-processes...")
+	time.sleep(.5)
 	CloseAllRunning()
+	Show("Initiating Refresh...")
+	time.sleep(.5)
 	python = sys.executable
 	os.execl(python, python, self_file)
 
@@ -1042,14 +1139,22 @@ def ModuleManipulation() -> None:
 		confirmation = messagebox.askyesno("Module Installation Prompt", f"Install {module}? (Not Found)", parent=root)
 		if not confirmation:
 			return
-		subprocess.run(f"pip install {module}", shell=True)
-		messagebox.showinfo("Command Complete", "Command to install either failed or succeeded, it's done now.", parent=root)
+		results = subprocess.run(f"pip install {module}", shell=True, capture_output=True, text=True)
+		output = results.stdout
+		output = "Nothing..." if output == "" else output
+		errors = results.stderr
+		errors = "Nothing..." if errors == "" else errors
+		messagebox.showinfo("Command Complete", f"Output:\n{output}\nError(s):\n{errors}", parent=root)
 	else:
 		confirmation = messagebox.askyesno("Module Deletion Prompt", f"Delete {module}? (Already Installed)", parent=root)
 		if not confirmation:
 			return
-		subprocess.run(f"pip uninstall {module} -y", shell=True)
-		messagebox.showinfo("Command Complete", "Command to delete either failed or succeeded, it's done now.", parent=root)
+		results = subprocess.run(f"pip uninstall {module} -y", shell=True, capture_output=True, text=True)
+		output = results.stdout
+		output = "Nothing..." if output == "" else output
+		errors = results.stderr
+		errors = "Nothing..." if errors == "" else errors
+		messagebox.showinfo("Command Complete", f"Output:\n{output}\nError(s):\n{errors}", parent=root)
 
 def Backup() -> None:
 	Log("Backup()", type="SYSTEM", time_log=True)
@@ -1394,20 +1499,23 @@ def OpenSettings(page:int=0, update:bool=False, _from=root) -> None:
 		icon_run_checkbox = tk.Checkbutton(settings_root, text="Iconify Root When Running", variable=setting_variables[8], command=SignalUpdate, bg=self_theme.bg, fg=self_theme.fg, selectcolor=self_theme.bg)
 		icon_run_checkbox.grid(row=8, column=0, columnspan=6, padx=10, pady=10)
 
+		free_run_checkbox = tk.Checkbutton(settings_root, text="When Running, Free Process From Self", variable=setting_variables[9], command=SignalUpdate, bg=self_theme.bg, fg=self_theme.fg, selectcolor=self_theme.bg)
+		free_run_checkbox.grid(row=9, column=0, columnspan=6, padx=10, pady=10)
+
 		settings_id_label = tk.Label(settings_root, text=f"Settings ID: {BinaryIn("".join(str(int(val.get())) for val in setting_variables))}", bg=self_theme.bg, fg=self_theme.fg)
-		settings_id_label.grid(row=9, column=0, columnspan=6, padx=5, pady=5)
+		settings_id_label.grid(row=10, column=0, columnspan=6, padx=5, pady=5)
 	
 		settings_id_button = tk.Button(settings_root, text="Input Settings ID", command=InputID, bg=self_theme.bg, fg=self_theme.fg)
-		settings_id_button.grid(row=10, column=2, columnspan=2, padx=5, pady=5)
+		settings_id_button.grid(row=11, column=2, columnspan=2, padx=5, pady=5)
 
 		keybinds_button = tk.Button(settings_root, text="-> Keybinds (Page 1)", command=lambda: ChangePage(1), bg=self_theme.bg, fg=self_theme.fg)
-		keybinds_button.grid(row=11, column=2, columnspan=2, padx=5, pady=5)
+		keybinds_button.grid(row=12, column=2, columnspan=2, padx=5, pady=5)
 
 		save_exit_button = tk.Button(settings_root, text="Save and Exit", command=SaveExit, bg=self_theme.bg, fg=self_theme.fg)
-		save_exit_button.grid(row=12, column=2, padx=5, pady=5)
+		save_exit_button.grid(row=13, column=2, padx=5, pady=5)
 
 		exit_button = tk.Button(settings_root, text="Exit", command=Exit, bg=self_theme.bg, fg=self_theme.fg)
-		exit_button.grid(row=12, column=3, padx=5, pady=5)
+		exit_button.grid(row=13, column=3, padx=5, pady=5)
 
 		update_thread = threading.Thread(target=UpdateId)
 		update_thread.daemon = True
@@ -1534,7 +1642,7 @@ def Info() -> None:
 		if_selected_in_scripts = selected_script.get() in scripts.values()
 	except Exception:
 		pass
-	Input(f"Selected: {selected_script.get()}\nAbsolute Path: {absolute_filepath}\nSelected In Scripts: {if_selected_in_scripts}\nSettings: {[bool(setting.get()) for setting in setting_variables]}\nSelf Dir: {self_directory}\nSelf file: {self_file}")
+	Input(f"Selected: {selected_script.get()}\nAbsolute Path: {absolute_filepath}\nSelected In Scripts: {if_selected_in_scripts}\nSelf Dir: {self_directory}\nSelf file: {self_file}")
 
 	GLOBALS = globals()
 	for g in GLOBALS.keys():
@@ -1545,8 +1653,12 @@ def CloseHub():
 	Show("Writing Condition File...")
 	WriteTo(f"{self_directory}/{self_name}Condition.txt", f"{absolute_filepath}\n{self_name}\n{self_directory}")
 	Log("HUB CLOSE", type="SYSTEM", time_log=True)
+	time.sleep(.5)
 	Show("Searching/Closing Sub-processes...")
+	time.sleep(.5)
 	CloseAllRunning()
+	Show("Exiting...")
+	time.sleep(.5)
 	sys.exit()
 
 def UpdateScripts() -> None:
@@ -1748,7 +1860,8 @@ root.bind("<Control-l>", lambda event: ListScripts())
 root.bind("<Control-d>", lambda event: ListDropdown())
 root.bind("<Control-w>", lambda event: WebSearch())
 root.bind("<Control-e>", lambda event: SystemRun())
-root.bind("esc", lambda event: CloseAllRunning())
+root.bind("<Control-p>", lambda event: SetFreeChoose())
+root.bind("<Escape>", lambda event: CloseAllRunning())
 
 binds_file = ContentOfFile(f"{self_name}Binds.txt", "List")
 
@@ -1790,6 +1903,6 @@ if open_file != None:
 	OnScriptSelection(opened_filename)
 
 TopWindow(root, hold=True)
-print("Initialized")
+print("Initialized\n")
 
 root.mainloop()
