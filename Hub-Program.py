@@ -5,6 +5,7 @@ import threading
 import os
 import sys
 import time
+import asyncio
 import ctypes
 import importlib.util
 from importlib.metadata import distributions
@@ -16,16 +17,23 @@ import ast
 import webbrowser
 
 log_limit = 250
+allow_review = False
 
 print(f"\nIntialization |Backend")
 
 if 'win' in sys.platform:
 	ctypes.windll.shcore.SetProcessDpiAwareness(2)
 
+opening_error = False
 try:
 	open_file = sys.argv[1]
+	if not os.path.exists(open_file):
+		opening_error = True
 except Exception:
 	open_file = None
+
+def HandleSelfChange() -> None:
+	...
 
 self_file = __file__[len(__file__) - __file__[::-1].find("\\"):]
 self_name = f"{self_file.replace('.py', '')}"
@@ -52,7 +60,7 @@ command_history = []
 running_processes = []
 running_names = []
 killed_index = None
-absolute_filepath = open_file
+absolute_filepath = open_file if not opening_error else None
 self_directory = os.path.dirname(os.path.realpath(__file__))
 
 print(f"\tOpening: {open_file}\n\tFile: {self_file}\n\tPlatform: {platform}\n\tDirectory: {self_directory}\n")
@@ -70,11 +78,14 @@ def ConfigWidget(widget=None, arg=None, value=None) -> None:
 	
 	data_type = type(widget)
 
-	if data_type == str:
-		exec(f"global {widget}\n{widget}.config({arg}={value})")
-	elif data_type == list:
-		for w in widget:
-			exec(f"global {w}\n{w}.config({arg}={value})")
+	try:
+		if data_type == str:
+			exec(f"global {widget}\n{widget}.config({arg}={value})")
+		elif data_type == list:
+			for w in widget:
+				exec(f"global {w}\n{w}.config({arg}={value})")
+	except Exception as e:
+		Show(f"Error In ConfigWidget\n\n{str(e)}")
 
 def ReloadDropdown(dropdown=None, new_options:list=[""], new_command="", attempt_keep:bool=True, default:str="", variable=None) -> None:
 	if dropdown == None or variable == None:
@@ -86,18 +97,17 @@ def ReloadDropdown(dropdown=None, new_options:list=[""], new_command="", attempt
 		menu.delete(0, "end")
 		if option_type == list:
 			for option in new_options:
-				new_command = new_command.replace("INDEX", f"'{option}'")
-				exec(f"menu.add_command(label=option, command={new_command})")
+				exec(f"menu.add_command(label=option, command={new_command.replace("INDEX", f"'{option}'")})")
 		elif option_type == dict:
 			for key, value in new_options.items():
-				exec(f"menu.add_command(label=key, command={new_command.replace("KEY", f"'{key}'").replace("VALUE", f"{value}")})")
+				exec(f"menu.add_command(label='{key}', command={new_command.replace("KEY", f"'{key}'").replace("VALUE", f"{value}")})")
 		names = new_options if option_type == list else new_options.keys()
 		if not attempt_keep or not variable.get() in names:
 			variable.set(default)
 		Log("ReloadDropdown()")
 		
 	except Exception as e:
-		pass
+		Show(f"Error In ReloadDropdown\n\n{str(e)}")
 
 def Log(entry:str="DefaultLogEntry", type:str="ACCESS", time_log=False) -> None:
 	#Show(f"Logging({entry}, {type}, {time_log})")
@@ -421,15 +431,6 @@ HUB FUNCTIONS
 
 """
 
-def SetSelected(name: str="Select a script") -> None:
-	Log(f"SetSelected(name={name})")
-	if type(name) != str:
-		name = "Select a script"
-	else:
-		if len(name) > 20:
-			name = name[:-len(name) + 20] + "..."
-	selected_script.set(name)
-
 def Filepath(filename: str|None=None) -> str|None:
 	Log(f"Filepath(filename={filename})")
 	if filename == "Select a script":
@@ -448,6 +449,16 @@ def Filename(path:str=None) -> None:
 	if not "/" in path:
 		return path
 	return path[len(path) - path[::-1].find("/"):]
+
+def SetSelected(name: str="Select a script") -> None:
+	Log(f"SetSelected(name={name})")
+	if type(name) != str:
+		name = "Select a script"
+	else:
+		name = Filename(name)
+		if len(name) > 20:
+			name = name[:-len(name) + 20] + "..."
+	selected_script.set(name)
 
 def FoldersInPath(path:str=None) -> list:
 	if path == None:
@@ -494,6 +505,16 @@ def SeeCode(filename=None) -> None:
 		time.sleep(2)
 		Delete()
 
+def CheckProcesses() -> None:
+	dead = 0
+	for process in running_processes:
+		if type(process) == str:
+			dead += 1
+	all = len(running_processes)
+	print(f"CHECKPROCESSES\nConcludes: {dead}/{all}\n")
+	if dead == all:
+		ConfigWidget("close_button", "state", "tk.DISABLED")
+
 def RunScript(filename=None) -> None:
 	Log(f"RunScript(filename={filename})")
 	filename = filename if filename != None else selected_script.get()
@@ -504,7 +525,7 @@ def RunScript(filename=None) -> None:
 		return
 
 	def ScriptThread() -> None:
-		global running_processes, running_names
+		global running_processes, running_names, allow_review
 
 		self_run_index = None
 		self_run_name = Filename(filepath)
@@ -517,12 +538,15 @@ def RunScript(filename=None) -> None:
 			subprocess.Popen(filepath, shell=True)
 		else:
 			self_run_index = len(running_processes)
+			self_killed = False
 			ConfigWidget("close_button", "state", "tk.NORMAL")
 			running_names.append(self_run_name)
-			running_processes.append(subprocess.Popen(filepath, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True))
-			result, error = running_processes[self_run_index].communicate()
-			result, error = result if result != "" else "Nothing...", error if error != "" else "Nothing..."
-			self_killed = False
+			running_processes.append(subprocess.Popen(filepath, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, text=True, shell=True))
+			try:
+				result, error = running_processes[self_run_index].communicate()
+				result, error = result if result != "" else "Nothing...", error if error != "" else "Nothing..."
+			except RuntimeError:
+				result, error = "Process Killed Before Initialization", "Process 'communicate()' failed to retreive results."
 			death_state = running_processes[self_run_index]
 			if death_state != "Free" and death_state != "Denied":
 				if killed_index == self_run_index:
@@ -532,24 +556,10 @@ def RunScript(filename=None) -> None:
 					running_processes[self_run_index] = "Finished"
 
 			print(f"\nSCRIPTTHREAD - ({self_run_name})\nFor Run of index {self_run_index}\nProcess Signature: {running_processes[self_run_index]}\n")
+			CheckProcesses()
+			allow_review = True
 
 		try:		
-			#Cleaner that will have better implementation later
-			running_count = len(running_processes)
-			dead_count = 0
-			for run in running_processes:
-				if run == None:
-					dead_count += 1
-		
-			all_dead = False
-			if running_count <= dead_count + 1:
-				all_dead = True
-				#running_processes = []
-				#running_names = []
-			
-			if all_dead:
-				...
-
 			if not self_killed and death_state != "Free":
 				Show(Centered(f"Output from {filename}", "_", end=True, end_line=3) + f"{result}\n\n\n{Centered(f"Error(s) from {filename}", "_", end=True)}\n\n\n{error}\n\n\n")
 			TopWindow(root, hold=True)
@@ -560,7 +570,7 @@ def RunScript(filename=None) -> None:
 	run_thread.start()
 
 def CloseRunning(index:int=None) -> None:
-	global running_processes, killed_index
+	global running_processes, killed_index, allow_review
 	index = index if index != None else len(running_processes) - 1
 	if index == -1:
 		return
@@ -573,7 +583,7 @@ def CloseRunning(index:int=None) -> None:
 			Show(f"Process {process_name} at index {index} is free or already closed.")
 			return
 		killed_index = index
-		print(f"CLOSERUNNING - ({process_name})\nSet killed index to {index}")
+		print(f"\n{'=' * 20}\nCLOSERUNNING - ({process_name})\nSet killed index to {index}")
 		results = subprocess.Popen("TASKKILL /F /PID {pid} /T".format(pid=process.pid), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 		success = results.stdout.read()
 		errors = results.stderr.read()
@@ -581,17 +591,18 @@ def CloseRunning(index:int=None) -> None:
 			running_processes[index] = "Lost"
 		if "denied" in errors.lower():
 			running_processes[index] = "Denied"
-		print(f"Reviewed Signature: {running_processes[index]}")
-		Show(f"\nOutput:\n{success if success != '' else 'Nothing...'}\n\nError(s):\n{errors if errors != '' else 'Nothing...'}")
-		dead = 0
-		for process in running_processes:
-			if type(process) == str:
-				dead += 1
-
-		print(f"Dead/Total: {dead}/{len(running_processes)}\n")
-		if dead == len(running_processes):
-			print(f"CloseRunning Detected All Processes Dead.\n\n")
-			ConfigWidget("close_button", "state", "tk.DISABLED")
+		if errors == "":
+			running_processes[index] = "Killed"
+		limit = 100
+		while not allow_review:
+			if limit <= 0:
+				break
+			limit -= 1
+			time.sleep(.01)
+		allow_review = False
+		print(f"Reviewed Signature: {running_processes[index]}\n{'=' * 20}\n")
+		close_signoff = f"\nOutput:\n{success if success != '' else 'Nothing...'}\n\nError(s):\n{errors if errors != '' else 'Nothing...'}" if running_processes[index] != "Denied" else f"Program was denied closing permissions for {running_names[index]}, run program with higher permisions to be able to close processes of this type."
+		Show(close_signoff)
 	except Exception as e:
 		Input(str(e))
 
@@ -646,6 +657,7 @@ def SetFree(index:int):
 	if index > len(running_processes) - 1:
 		return
 	running_processes[index] = "Free"
+	CheckProcesses()
 
 def SetFreeChoose() -> None:
 	free_root = Toplevel(root)
@@ -673,8 +685,6 @@ def SetFreeChoose() -> None:
 				SetFree(index)
 
 	if end_row == None:
-		Show("Error on accounting of running_processes. None found, configuring button.")
-		ConfigWidget("close_button", "state", "tk.DISABLED")
 		free_root.destroy()
 		return
 
@@ -775,6 +785,7 @@ def EditScript(filename=None) -> None:
 	global func_drop_change
 	filename = filename if filename != None else selected_script.get()
 	filepath = Filepath(filename)
+	filename = Filename(filename)
 	
 	if not filepath == None and os.path.exists(filepath):
 		global FindLine, selected_func
@@ -809,8 +820,11 @@ def EditScript(filename=None) -> None:
 			function_setting = bool(setting_variables[7].get())
 			exiting_content = ContentOfFile(filepath).strip()
 			content = text_widget.get("1.0", tk.END).strip()
-			keyboard.remove_hotkey("esc")
-			keyboard.remove_hotkey("ctrl+shift+h")
+			try:
+				keyboard.remove_hotkey("ctrl+shift+h")
+				keyboard.remove_hotkey("esc")
+			except Exception:
+				pass
 			keyboard.add_hotkey("ctrl+shift+h", lambda: TopWindow(root))
 
 			file_difference = True if (exiting_content != content and not exiting_content == "Non-existant File") else False
@@ -820,10 +834,14 @@ def EditScript(filename=None) -> None:
 				if confirmation:
 					SaveScript()
 
+			if os.path.exists(filepath):
+				OnScriptSelection()
+			else:
+				DropdownManipulation(system_call=True)
+				Show(f"File {Filename(filepath)} was deleted. Recovery option is unavailable in this version after EditScript exit call.")
+
 			edit_root.destroy()
 			root.deiconify()
-			if os.path.exists(filepath):
-				OnScriptSelection()			
 
 			if file_difference and function_setting and editing_self and confirmation:
 				Refresh()
@@ -948,6 +966,18 @@ def EditScript(filename=None) -> None:
 			edit_root.bind("<Control-,>", Prev)
 			edit_root.bind("<Control-.>", Next)
 
+		def ReplaceString() -> None:
+			old = simpledialog.askstring("String Replace Prompt", "What would you like to replace?", parent=edit_root)
+			if old == None or old == "":
+				return
+			new = simpledialog.askstring("String Replace Prompt", "What would you like to replace it with?", parent=edit_root)
+			if new == None or new == "":
+				return
+			content = text_widget.get("1.0", tk.END)
+			text_widget.delete("1.0", tk.END)
+			text_widget.insert(tk.END, content.replace(old, new))
+			messagebox.showinfo("ReplaceString Finished", f"Replaced all instances of {old} to {new}.", parent=edit_root)
+
 		line_button = tk.Button(edit_root, text="Go To Line", command=FindLine, width=20, bg=self_theme.bg, fg=self_theme.fg)
 		line_button.grid(row=0, column=2, pady=5)
 
@@ -1040,6 +1070,7 @@ def EditScript(filename=None) -> None:
 
 		edit_root.bind("<Control-s>", lambda e: SaveScript())
 		edit_root.bind("<Control-f>", lambda e: FindString())
+		edit_root.bind("<Control-p>", lambda e: ReplaceString())
 		edit_root.bind("<Control-l>", lambda e: FindLine())
 		edit_root.bind("<Control-d>", lambda e: DeleteScript())
 		edit_root.bind("<Control-r>", lambda e: RestoreScript())
@@ -1073,7 +1104,7 @@ def Refresh() -> None:
 	python = sys.executable
 	os.execl(python, python, self_file)
 
-def DropdownManipulation() -> None:
+def DropdownManipulation(system_call=False) -> None:
 	Log("DropdownManipulation()")
 	def Add(filename=None) -> None:
 		Log("Add()")
@@ -1105,7 +1136,7 @@ def DropdownManipulation() -> None:
 		Log("Remove()")
 		global scripts, inv_scripts
 		selected = selected_script.get()
-		if selected != "Select a script":
+		if selected in scripts.keys():
 			scripts.pop(selected)
 			inv_scripts = {v: k for k, v in scripts.items()}
 			PushScripts()
@@ -1115,10 +1146,14 @@ def DropdownManipulation() -> None:
 	selected = selected_script.get()
 	exists_in = selected in scripts.keys()
 
-	if exists_in:
-		confirmation = messagebox.askyesno("Dropdown Removal Confirmation", f"Remove {selected} from dropdown?", parent=root)
+	if system_call:
+		Remove()
+		return
 	else:
-		confirmation = messagebox.askyesno("Dropdown Addition Confirmation", f"Add {selected} to dropdown?", parent=root)
+		if exists_in:
+			confirmation = messagebox.askyesno("Dropdown Removal Confirmation", f"Remove {selected} from dropdown?", parent=root)
+		else:
+			confirmation = messagebox.askyesno("Dropdown Addition Confirmation", f"Add {selected} to dropdown?", parent=root)
 
 	if confirmation:
 		if exists_in:
@@ -1571,12 +1606,13 @@ def OnScriptSelection(event=None, file=None, *args) -> None:
 	Delete()
 	file = selected_script.get() if file == None else file
 	filepath = Filepath(file)
+	ConfigWidget("dropdown_button", "state", "tk.NORMAL")
 	if filepath == None:
 		Input("Failed To Retrieve File Info (Control-I for Debug Info)")
 		return
 	if not os.path.exists(filepath):
 		return
-	ConfigWidget(["run_button", "edit_button", "see_code_button", "dropdown_button"], "state", "tk.NORMAL")
+	ConfigWidget(["run_button", "edit_button", "see_code_button"], "state", "tk.NORMAL")
 	if function_setting:
 		Input(Centered(f"File Info", "_", end=True, end_line=2))
 		mod_time_timestamp = os.path.getmtime(filepath) #Gemini Help (2 Lines) 
@@ -1659,6 +1695,7 @@ def CloseHub():
 	CloseAllRunning()
 	Show("Exiting...")
 	time.sleep(.5)
+	root.destroy()
 	sys.exit()
 
 def UpdateScripts() -> None:
@@ -1891,7 +1928,12 @@ Log(f"HUB STARTUP", type="SYSTEM", time_log=True)
 ApplySettings()
 UpdateScripts()
 ReloadDropdown(script_dropdown, scripts, "lambda: (selected_script.set(KEY), OnScriptSelection(None, file=scripts[KEY]))", True, "Select a script", selected_script)
-selected_script.set("Select a script" if open_file == None else Filename(open_file))
+if opening_error:
+	selected_script.set("Invalid Opening Path")
+	Show(f"Failed to open path '{open_file}' as it doesn't exist.")
+	open_file = None
+else:
+	selected_script.set("Select a script" if open_file == None else Filename(open_file))
 CheckHandleRename()
 
 root.protocol("WM_DELETE_WINDOW", lambda: CloseHub())
